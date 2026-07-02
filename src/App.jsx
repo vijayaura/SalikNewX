@@ -24,7 +24,6 @@ export default function App() {
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [selectedAddons, setSelectedAddons] = useState([])
   const [vehicleValue, setVehicleValue] = useState(VEHICLE.value)
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [policyStart, setPolicyStart] = useState(getTodayDate)
   const [processing, setProcessing] = useState(false)
@@ -76,7 +75,6 @@ export default function App() {
     registerAction(COPY.user.addons(selectedAddons.length))
     setStage('confirm')
     setMessages((m) => [...m, 'confirm'])
-    setAcceptedTerms(false)
     setDetailsExpanded(false)
     setPolicyStart(getTodayDate())
   }
@@ -98,7 +96,7 @@ export default function App() {
   }
 
   const handlePay = async () => {
-    if (stage !== 'confirm' || !acceptedTerms) return
+    if (stage !== 'confirm') return
     setProcessing(true)
     await delay(1800)
     setProcessing(false)
@@ -228,8 +226,6 @@ export default function App() {
                   onPolicyStartChange={setPolicyStart}
                   detailsExpanded={detailsExpanded}
                   onToggleDetails={() => setDetailsExpanded((open) => !open)}
-                  acceptedTerms={acceptedTerms}
-                  onToggleTerms={() => setAcceptedTerms((t) => !t)}
                   onDownloadQuote={handleDownloadQuote}
                   onProceed={handlePay}
                   processing={processing && stage === 'confirm'}

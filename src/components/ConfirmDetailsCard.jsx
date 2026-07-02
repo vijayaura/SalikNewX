@@ -27,8 +27,6 @@ export default function ConfirmDetailsCard({
   onPolicyStartChange,
   detailsExpanded,
   onToggleDetails,
-  acceptedTerms,
-  onToggleTerms,
   onDownloadQuote,
   onProceed,
   processing,
@@ -159,10 +157,10 @@ export default function ConfirmDetailsCard({
         </div>
       </div>
 
-      <button type="button" onClick={onToggleTerms} className="flex items-start gap-2 w-full text-left">
-        <Checkbox checked={acceptedTerms} />
+      <div className="flex items-start gap-2 w-full">
+        <Checkbox checked />
         <p className="text-[10px] text-gray-600 leading-relaxed">{COPY.cards.terms}</p>
-      </button>
+      </div>
 
       <div className="flex gap-2">
         <button
@@ -175,7 +173,7 @@ export default function ConfirmDetailsCard({
         <button
           type="button"
           onClick={onProceed}
-          disabled={!acceptedTerms || processing}
+          disabled={processing}
           className="flex-1 rounded-full bg-liva-orange text-white text-xs font-semibold py-2.5 shadow-btn-primary transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
         >
           {processing ? 'Processing…' : COPY.buttons.proceedToPayment}
