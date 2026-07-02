@@ -105,7 +105,6 @@ export default function App() {
   }
 
   const handleVerify = async () => {
-    registerAction(COPY.user.verify)
     setProcessing(true)
     await delay(2000)
     setProcessing(false)
@@ -255,7 +254,6 @@ export default function App() {
         <AnimatePresence>
           {messages.includes('policy') && (
             <motion.div key="policy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-              <UserAction delay={0}>{userActions[2] ?? COPY.user.verify}</UserAction>
               <ChatBubble role="ai">{COPY.policy}</ChatBubble>
               <div className="ml-9">
                 <PolicyReady onDownload={handleDownload} />

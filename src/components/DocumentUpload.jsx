@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, CheckCircle2, Download, Upload } from 'lucide-react'
-import { InlineButton } from './ChatBubble'
 import { COPY } from '../copy'
 
 const DOCS = [
@@ -11,6 +10,16 @@ const DOCS = [
 
 export default function DocumentUpload({ uploaded, uploading, onVerify }) {
   const [docProgress, setDocProgress] = useState({})
+  const verifiedRef = useRef(false)
+
+  useEffect(() => {
+    if (verifiedRef.current || uploaded || uploading || !onVerify) return
+    const allDone = DOCS.every((doc) => (docProgress[doc.id] ?? 0) === 100)
+    if (allDone) {
+      verifiedRef.current = true
+      onVerify()
+    }
+  }, [docProgress, uploaded, uploading, onVerify])
 
   const simulateUpload = (docId) => {
     if (docProgress[docId] === 100) return
@@ -79,14 +88,6 @@ export default function DocumentUpload({ uploaded, uploading, onVerify }) {
         )
       })}
 
-      {onVerify && !uploading && !uploaded && (
-        <InlineButton
-          onClick={onVerify}
-          disabled={!DOCS.every((doc) => docProgress[doc.id] === 100)}
-        >
-          {COPY.buttons.verify}
-        </InlineButton>
-      )}
     </div>
   )
 }
