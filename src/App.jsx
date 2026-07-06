@@ -446,7 +446,7 @@ export default function App() {
         />
 
         <AnimatePresence>
-          {messages.includes('plan') && (
+          {messages.includes('plan') && resumeFlow?.step !== 'plan' && (
             <motion.div key="plan" data-journey="plan" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={planLocked}>
                 <div className="ml-9">
@@ -470,7 +470,7 @@ export default function App() {
         />
 
         <AnimatePresence>
-          {messages.includes('addons') && (
+          {messages.includes('addons') && resumeFlow?.step !== 'addons' && (
             <motion.div key="addons" data-journey="addons" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={journeyLocked}>
                 <UserAction delay={0}>{userActions[0]}</UserAction>
@@ -501,7 +501,7 @@ export default function App() {
         />
 
         <AnimatePresence>
-          {messages.includes('confirm') && (
+          {messages.includes('confirm') && resumeFlow?.step !== 'confirm' && (
             <motion.div key="confirm" data-journey="confirm" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={confirmLocked}>
                 <UserAction delay={0}>{userActions[1]}</UserAction>
@@ -536,7 +536,7 @@ export default function App() {
         />
 
         <AnimatePresence>
-          {messages.includes('docs') && (
+          {messages.includes('docs') && resumeFlow?.step !== 'docs' && (
             <motion.div key="docs" data-journey="docs" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <ChatBubble role="ai">
                 <PaymentMessage />
