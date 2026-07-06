@@ -8,7 +8,7 @@ const DOCS = [
   { id: 'driving-license', name: 'Driving License' },
 ]
 
-export default function DocumentUpload({ uploaded, uploading, onVerify }) {
+export default function DocumentUpload({ uploaded, uploading, onVerify, highlightNext = false }) {
   const [docProgress, setDocProgress] = useState({})
   const verifiedRef = useRef(false)
 
@@ -39,13 +39,18 @@ export default function DocumentUpload({ uploaded, uploading, onVerify }) {
       {DOCS.map((doc, i) => {
         const progress = getProgress(doc.id)
         const done = progress === 100
+        const isNextDoc =
+          highlightNext &&
+          !done &&
+          !uploading &&
+          doc.id === DOCS.find((d) => getProgress(d.id) !== 100)?.id
 
         return (
           <div
             key={doc.id}
             className={`rounded-xl border border-gray-200 overflow-hidden px-3 py-2.5 shadow-soft ${
               i % 2 === 0 ? 'texture-card-muted' : 'texture-card'
-            }`}
+            } ${isNextDoc ? 'action-shimmer ring-1 ring-liva-orange/25' : ''}`}
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-semibold text-gray-900 min-w-0 truncate">

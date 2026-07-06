@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { User } from 'lucide-react'
 import { LivaAvatar } from './LivaLogo'
 
-export default function ChatBubble({ role, children, delay = 0 }) {
+export default function ChatBubble({ role, children, delay = 0, scrollAnchor = false }) {
   const isAI = role === 'ai'
 
   return (
@@ -11,6 +11,7 @@ export default function ChatBubble({ role, children, delay = 0 }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay }}
       className={`flex gap-2 items-start ${isAI ? '' : 'flex-row-reverse'}`}
+      {...(scrollAnchor ? { 'data-scroll-anchor': true } : {})}
     >
       {isAI ? (
         <LivaAvatar />

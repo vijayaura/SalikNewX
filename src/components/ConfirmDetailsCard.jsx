@@ -30,6 +30,7 @@ export default function ConfirmDetailsCard({
   onDownloadQuote,
   onProceed,
   processing,
+  highlightNext = false,
 }) {
   const [hasClaims, setHasClaims] = useState(false)
   const [email, setEmail] = useState(USER.email)
@@ -174,9 +175,13 @@ export default function ConfirmDetailsCard({
           type="button"
           onClick={onProceed}
           disabled={processing}
-          className="flex-1 rounded-full bg-liva-orange text-white text-xs font-semibold py-2.5 shadow-btn-primary transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+          className={`relative flex-1 rounded-full bg-liva-orange text-white text-xs font-semibold py-2.5 shadow-btn-primary transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none overflow-hidden ${
+            highlightNext && !processing ? 'action-shimmer action-shimmer-orange' : ''
+          }`}
         >
-          {processing ? 'Processing…' : COPY.buttons.proceedToPayment}
+          <span className="relative z-[1]">
+            {processing ? 'Processing…' : COPY.buttons.proceedToPayment}
+          </span>
         </button>
       </div>
     </div>

@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { Send } from 'lucide-react'
 import { COPY } from '../copy'
 
-export default function ChatInput({ onSend, onSupport, disabled, suggestions = [] }) {
+export default function ChatInput({
+  onSend,
+  onSupport,
+  disabled,
+  suggestions = [],
+  aiConnected = false,
+}) {
   const [value, setValue] = useState('')
 
   const submit = () => {
@@ -20,7 +26,7 @@ export default function ChatInput({ onSend, onSupport, disabled, suggestions = [
   }
 
   return (
-    <div className="shrink-0 px-3 pb-2 pt-1">
+    <div className="shrink-0">
       <div className="relative overflow-hidden rounded-2xl border border-gray-100/90 shadow-elevated">
         <div className="dock-wave-bg absolute inset-0" aria-hidden />
         <div className="relative z-10 space-y-2 p-2.5">
@@ -55,7 +61,11 @@ export default function ChatInput({ onSend, onSupport, disabled, suggestions = [
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={disabled}
-              placeholder="Ask a question…"
+              placeholder={
+                aiConnected
+                  ? 'Ask Aura anything…'
+                  : 'Ask Aura about plans, claims, docs…'
+              }
               className="flex-1 min-w-0 bg-transparent py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
             />
             <button

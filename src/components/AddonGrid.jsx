@@ -37,7 +37,7 @@ function AddonIcon({ id, selected }) {
   )
 }
 
-export default function AddonGrid({ selectedAddons, onToggle, disabled, onContinue }) {
+export default function AddonGrid({ selectedAddons, onToggle, disabled, onContinue, highlightNext = false }) {
   const selectedCount = selectedAddons.length
   const selectedTotal = ADDONS.filter((a) => selectedAddons.includes(a.id)).reduce(
     (sum, a) => sum + a.price,
@@ -93,10 +93,12 @@ export default function AddonGrid({ selectedAddons, onToggle, disabled, onContin
           type="button"
           onClick={onContinue}
           disabled={disabled}
-          className="w-full rounded-lg bg-liva-orange text-white py-2.5 px-3 text-xs font-semibold shadow-btn-primary transition-colors hover:bg-liva-orange-light disabled:opacity-50"
+          className={`relative w-full rounded-lg bg-liva-orange text-white py-2.5 px-3 text-xs font-semibold shadow-btn-primary transition-colors hover:bg-liva-orange-light disabled:opacity-50 ${
+            highlightNext && !disabled ? 'action-shimmer action-shimmer-orange overflow-hidden' : ''
+          }`}
         >
           {selectedCount > 0 ? (
-            <span className="flex items-center justify-center gap-1.5 tabular-nums">
+            <span className="relative z-[1] flex items-center justify-center gap-1.5 tabular-nums">
               <span>{selectedCount} add-on{selectedCount > 1 ? 's' : ''}</span>
               <span className="opacity-60">·</span>
               <span>+{formatAED(selectedTotal)}</span>
@@ -104,7 +106,7 @@ export default function AddonGrid({ selectedAddons, onToggle, disabled, onContin
               <span>Continue</span>
             </span>
           ) : (
-            'Continue'
+            <span className="relative z-[1]">Continue</span>
           )}
         </button>
       )}

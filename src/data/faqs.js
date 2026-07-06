@@ -74,32 +74,6 @@ export const FAQS = [
 export const FAQ_FALLBACK =
   'I can help with plans, add-ons, documents, payment, claims, and support. Try asking about Comprehensive cover, optional upgrades, or how to make a claim.'
 
-export function findFaqAnswer(query) {
-  const normalized = query.toLowerCase().trim()
-  if (!normalized) return null
-
-  let bestMatch = null
-  let bestScore = 0
-
-  for (const faq of FAQS) {
-    let score = 0
-    for (const keyword of faq.keywords) {
-      if (normalized.includes(keyword)) {
-        score += keyword.length
-      }
-    }
-    if (normalized.includes(faq.question.toLowerCase().slice(0, 12))) {
-      score += 5
-    }
-    if (score > bestScore) {
-      bestScore = score
-      bestMatch = faq
-    }
-  }
-
-  return bestScore > 0 ? bestMatch.answer : FAQ_FALLBACK
-}
-
 export const FAQ_SUGGESTIONS = [
   'What does Comprehensive cover?',
   'What documents do I need?',

@@ -2,37 +2,40 @@ import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { formatAED, PLANS } from '../data'
 
-export default function PlanSelector({ selectedPlan, onSelect, disabled }) {
+export default function PlanSelector({ selectedPlan, onSelect, disabled, highlightNext = false }) {
   const [expanded, setExpanded] = useState(null)
 
-  const toggleCovers = (planId) => {
+  const toggleCovers = (planId, e) => {
+    e.stopPropagation()
     setExpanded((prev) => (prev === planId ? null : planId))
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 items-start">
       {PLANS.map((plan) => {
         const selected = selectedPlan === plan.id
         const isExpanded = expanded === plan.id
         const isRecommended = plan.recommended
 
+        const showShimmer = highlightNext && !disabled
+
         return (
           <div
             key={plan.id}
-            className={`relative flex flex-col rounded-lg border transition-colors overflow-hidden ${
+            className={`relative flex w-full flex-col self-start rounded-lg border transition-colors overflow-hidden ${
               isRecommended || selected
                 ? 'texture-card-accent border-liva-orange shadow-elevated'
                 : 'texture-card border-gray-200 shadow-soft'
-            } ${disabled ? 'opacity-60' : ''}`}
+            } ${disabled ? 'opacity-60' : ''} ${showShimmer ? 'action-shimmer action-shimmer-plan ring-1 ring-liva-orange/25' : ''}`}
           >
-            <div className="flex flex-1 flex-col p-2 pb-2 min-h-[88px]">
+            <div className="relative p-2 pb-3">
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onSelect(plan.id)}
-                className="text-left"
+                className="w-full text-left"
               >
-                <p className="text-[11px] font-semibold text-gray-900 leading-snug pr-1">
+                <p className="text-[11px] font-semibold text-gray-900 leading-tight pr-5">
                   {plan.name}
                 </p>
               </button>
@@ -41,7 +44,7 @@ export default function PlanSelector({ selectedPlan, onSelect, disabled }) {
                 type="button"
                 disabled={disabled}
                 onClick={() => onSelect(plan.id)}
-                className="mt-1.5 flex items-center justify-between gap-1"
+                className="flex w-full items-center justify-between gap-1"
               >
                 <p className="text-xs font-bold text-gray-900 tabular-nums">{formatAED(plan.price)}</p>
                 <div
@@ -53,26 +56,24 @@ export default function PlanSelector({ selectedPlan, onSelect, disabled }) {
                 </div>
               </button>
 
-              <div className={`mt-auto pt-2 ${isRecommended ? 'flex flex-col gap-1.5' : ''}`}>
-                <button
-                  type="button"
-                  onClick={() => toggleCovers(plan.id)}
-                  className={`inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors ${
-                    isExpanded ? 'text-liva-orange' : 'text-gray-500 hover:text-liva-orange'
-                  }`}
-                >
-                  View more
-                  <ChevronDown
-                    className={`w-3 h-3 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                  />
-                </button>
+              <button
+                type="button"
+                onClick={(e) => toggleCovers(plan.id, e)}
+                className={`mt-2 inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors ${
+                  isExpanded ? 'text-liva-orange' : 'text-gray-500 hover:text-liva-orange'
+                }`}
+              >
+                View more
+                <ChevronDown
+                  className={`w-3 h-3 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </button>
 
-                {isRecommended && (
-                  <span className="self-end inline-flex items-center rounded-md bg-liva-orange text-white text-[8px] font-bold px-1.5 py-0.5">
-                    Recommended
-                  </span>
-                )}
-              </div>
+              {isRecommended && (
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-liva-orange px-1 py-px text-[7px] font-bold leading-tight text-white">
+                  Recommended
+                </span>
+              )}
             </div>
 
             {isExpanded && (
