@@ -439,7 +439,7 @@ export default function App() {
   const planLocked = stage !== 'plan' || !!redoFlow || divertedFromJourney
   const addonsLocked = stage !== 'addons' || !!redoFlow || divertedFromJourney
   const confirmLocked = !!redoFlow || divertedFromJourney
-  const docsLocked = divertedFromJourney
+  const docsLocked = chatDiverted
   const redoLocked = chatDiverted && !!redoFlow
   const journeyLocked = !!redoFlow
   const frozenPlan = redoFlow?.frozen.plan ?? selectedPlan
