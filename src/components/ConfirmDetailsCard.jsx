@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Calendar, ChevronDown, Pencil } from 'lucide-react'
 import {
   ADDONS,
-  PLANS,
   USER,
   VEHICLE,
   addMonthsToDate,
@@ -12,6 +11,7 @@ import {
   formatDisplayDate,
   formatVehicleLabel,
   fromInputDate,
+  getPlanById,
   getTodayDate,
   toInputDate,
 } from '../data'
@@ -38,7 +38,7 @@ export default function ConfirmDetailsCard({
   const [color, setColor] = useState(VEHICLE.color)
   const [emiratesIdExpiry, setEmiratesIdExpiry] = useState(USER.emiratesIdExpiry)
 
-  const plan = PLANS.find((p) => p.id === planId)
+  const plan = getPlanById(planId, vehicleValue)
   const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons)
   const selectedAddonItems = ADDONS.filter((a) => selectedAddons.includes(a.id))
   const policyEnd = addMonthsToDate(policyStart, 13)

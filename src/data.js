@@ -27,16 +27,30 @@ export const VEHICLE = {
   existingPolicyExpiry: '10/07/2026',
 }
 
-export const VALUE_LIMITS = {
-  step: 5_000,
-  min: 80_000,
-  max: 350_000,
+export const SUPPORT = {
+  phone: '800 722',
+  email: 'contactus.uae@liva.com',
 }
+
+/** Insured value can only be adjusted ±10% from the initial sum insured. */
+export const SUM_INSURED_TOLERANCE = 0.1
+
+export function getValueLimits(initialValue = VEHICLE.value) {
+  return {
+    step: 5_000,
+    min: Math.round(initialValue * (1 - SUM_INSURED_TOLERANCE)),
+    max: Math.round(initialValue * (1 + SUM_INSURED_TOLERANCE)),
+    initial: initialValue,
+  }
+}
+
+export const VALUE_LIMITS = getValueLimits(VEHICLE.value)
 
 export const PLANS = [
   {
     id: 'comprehensive',
     name: 'Comprehensive',
+    /** Base premium at VEHICLE.value — scaled proportionally when sum insured changes. */
     price: 1200,
     recommended: true,
     features: ['Full damage cover', 'Theft protection', 'Natural calamities'],
@@ -51,6 +65,7 @@ export const PLANS = [
   {
     id: 'third-party',
     name: 'Third Party Liability',
+    /** Base premium at VEHICLE.value — scaled proportionally when sum insured changes. */
     price: 1000,
     recommended: false,
     features: ['Legal liability', 'Third-party damage', 'Basic protection'],
@@ -111,6 +126,30 @@ export const VAT_RATE = 0.05
 
 export function formatAED(amount) {
   return `${amount.toLocaleString('en-AE')} AED`
+}
+
+/** Scale a plan premium proportionally to the current sum insured. */
+export function getPlanPrice(planId, vehicleValue = VEHICLE.value) {
+  const plan = PLANS.find((p) => p.id === planId)
+  if (!plan) return 0
+  return Math.round(plan.price * (vehicleValue / VEHICLE.value))
+}
+
+export function getPlanById(planId, vehicleValue = VEHICLE.value) {
+  const plan = PLANS.find((p) => p.id === planId)
+  if (!plan) return null
+  return { ...plan, price: getPlanPrice(planId, vehicleValue) }
+}
+
+export function getPlansWithPricing(vehicleValue = VEHICLE.value) {
+  return PLANS.map((plan) => ({
+    ...plan,
+    price: getPlanPrice(plan.id, vehicleValue),
+  }))
+}
+
+export function clampInsuredValue(value, limits = VALUE_LIMITS) {
+  return Math.min(limits.max, Math.max(limits.min, value))
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

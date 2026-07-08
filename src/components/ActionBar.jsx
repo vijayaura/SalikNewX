@@ -1,7 +1,15 @@
-import { formatAED, calculateTotal, PLANS } from '../data'
+import { formatAED, calculateTotal, getPlanById } from '../data'
 
-export default function ActionBar({ stage, planId, selectedAddons, acceptedTerms, onAction, processing }) {
-  const plan = PLANS.find((p) => p.id === planId)
+export default function ActionBar({
+  stage,
+  planId,
+  selectedAddons,
+  vehicleValue,
+  acceptedTerms,
+  onAction,
+  processing,
+}) {
+  const plan = getPlanById(planId, vehicleValue)
   const { total } = calculateTotal(plan?.price ?? 0, selectedAddons)
 
   const config = {
@@ -51,8 +59,8 @@ export default function ActionBar({ stage, planId, selectedAddons, acceptedTerms
   )
 }
 
-export function LiveTotal({ planId, selectedAddons, visible }) {
-  const plan = PLANS.find((p) => p.id === planId)
+export function LiveTotal({ planId, selectedAddons, vehicleValue, visible }) {
+  const plan = getPlanById(planId, vehicleValue)
   const { total } = calculateTotal(plan?.price ?? 0, selectedAddons)
 
   if (!visible || !planId) return null

@@ -1,4 +1,5 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
+import { SUPPORT } from '../data'
 import { buildSystemPrompt as buildBaseSystemPrompt } from './buildChatContext'
 import { getControversialFallback, isControversialQuery } from './contentGuard'
 import { getLocalChatReply } from './localChat'
@@ -13,6 +14,21 @@ const AZURE_SETUP_HINT =
 
 function buildFaqKnowledge() {
   return FAQS.map((faq) => `- ${faq.question} ${faq.answer}`).join('\n')
+}
+
+/**
+ * Claude sometimes hallucinates legacy HSBC contact details for LIVA — force correct support info.
+ */
+function sanitizeAiReply(text, context) {
+  const email = context?.supportEmail || SUPPORT.email
+
+  return text
+    .replace(/contactus\.uae@hsbc\.com/gi, email)
+    .replace(/[\w.-]*@hsbc\.com/gi, email)
+    .replace(
+      /(Email:\s*)(?:[\w.-]+@hsbc\.com|contactus\.uae@hsbc\.com)/gi,
+      `$1${email}`,
+    )
 }
 
 /** Map in-app chat rows to the API conversationHistory shape. */
@@ -32,7 +48,11 @@ When FAQ knowledge applies, prefer it for LIVA product facts.
 Always format replies with Markdown (**bold**, *italics*, "- " bullet lines, blank lines between sections).
 
 Reference knowledge (use when relevant):
-${buildFaqKnowledge()}`
+${buildFaqKnowledge()}
+
+Official LIVA support (use exactly — no other emails or partners):
+- Phone: ${context.supportPhone}
+- Email: ${context.supportEmail}`
 }
 
 /**
@@ -123,7 +143,8 @@ export async function getChatReply(query, { history = [], context }) {
   try {
     const conversationHistory = toConversationHistory(history)
     const systemPrompt = buildFullSystemPrompt(context)
-    const text = await callClaudeChat(trimmed, conversationHistory, systemPrompt)
+    const rawText = await callClaudeChat(trimmed, conversationHistory, systemPrompt)
+    const text = sanitizeAiReply(rawText, context)
 
     aiReady = true
     return { text, source: 'claude' }

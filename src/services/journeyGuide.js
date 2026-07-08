@@ -54,6 +54,40 @@ export function resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan 
   const onPlan = (stage === 'plan' && !redoFlow) || redoFlow?.step === 'plan'
   const onAddons = (stage === 'addons' && !redoFlow) || redoFlow?.step === 'addons'
 
+  if (revision === 'sum-insured') {
+    if (['documents', 'complete'].includes(stage)) {
+      return {
+        action: 'blocked',
+        message: 'Your policy is already in progress — contact support on 800 722 if you need to change your sum insured.',
+      }
+    }
+
+    if (onPlan && !redoFlow) {
+      return {
+        action: 'already',
+        step: 'plan',
+        message:
+          'Use the **+** and **−** buttons next to your sum insured above — plan prices update automatically as you adjust it.',
+      }
+    }
+
+    if (redoFlow?.step === 'plan') {
+      return {
+        action: 'already',
+        step: 'plan',
+        message:
+          'Adjust your sum insured with the **+** and **−** buttons above, then pick your plan again — premiums update with the new value.',
+      }
+    }
+
+    return {
+      action: 'redo',
+      type: 'plan',
+      message:
+        'No problem! Adjust your sum insured below and select your plan again — premiums will update based on the new value.',
+    }
+  }
+
   if (revision === 'plan' && onPlan) {
     return { action: 'already', step: 'plan' }
   }

@@ -75,7 +75,7 @@ export const GENERAL_KNOWLEDGE = [
     id: 'sum-insured',
     keywords: ['sum insured', 'insured value', 'car value', 'valuation'],
     answer:
-      'Sum insured is the maximum amount your insurer pays if your car is written off. It\'s based on your vehicle\'s market value — you can adjust it on the review screen within allowed limits.',
+      'Sum insured is the maximum amount your insurer pays if your car is written off. It\'s based on your vehicle\'s market value — you can adjust it within ±10% of the initial value on the review screen.',
   },
   {
     id: 'dubai',

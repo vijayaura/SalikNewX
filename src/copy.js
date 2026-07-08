@@ -1,4 +1,4 @@
-import { USER } from './data'
+import { USER, SUPPORT } from './data'
 
 const firstName = USER.name.split(' ')[0]
 
@@ -6,7 +6,7 @@ export const COPY = {
   plans: 'Pick the cover that works for you — tap to select.',
   confirm: 'Please review your details below — confirm when everything looks good.',
   policy: `You're all set, ${firstName}! Your policy is active.`,
-  support: 'Need help? Call 800 722 or email contactus.uae@hsbc.com',
+  support: `Need help? Call ${SUPPORT.phone} or email ${SUPPORT.email}`,
   user: {
     plan: (name) => `${name} — let's go!`,
     addons: (count) => {

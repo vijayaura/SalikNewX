@@ -1,9 +1,16 @@
 import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
-import { formatAED, PLANS } from '../data'
+import { formatAED, getPlansWithPricing } from '../data'
 
-export default function PlanSelector({ selectedPlan, onSelect, disabled, highlightNext = false }) {
+export default function PlanSelector({
+  selectedPlan,
+  onSelect,
+  disabled,
+  highlightNext = false,
+  vehicleValue,
+}) {
   const [expanded, setExpanded] = useState(null)
+  const plans = getPlansWithPricing(vehicleValue)
 
   const toggleCovers = (planId, e) => {
     e.stopPropagation()
@@ -12,7 +19,7 @@ export default function PlanSelector({ selectedPlan, onSelect, disabled, highlig
 
   return (
     <div className="grid grid-cols-2 gap-2 items-start">
-      {PLANS.map((plan) => {
+      {plans.map((plan) => {
         const selected = selectedPlan === plan.id
         const isExpanded = expanded === plan.id
         const isRecommended = plan.recommended

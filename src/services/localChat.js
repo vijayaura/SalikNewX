@@ -182,9 +182,22 @@ export function detectRevisionIntent(query) {
   const q = query.toLowerCase().trim()
 
   const changeVerb =
-    /\b(change|switch|update|redo|pick another|select (?:a )?different|want (?:a )?different|new|replace)\b/
+    /\b(change|switch|update|redo|pick another|select (?:a )?different|want (?:a )?different|new|replace|increase|decrease|raise|lower|adjust|revise|modify|set)\b/
   const wantChange =
-    /\b(i want to|i'd like to|i would like to|let me|can i|need to|want to|like to)\s+(change|switch|update|pick|choose|select)\b/
+    /\b(i want to|i'd like to|i would like to|let me|can i|need to|want to|like to)\s+(change|switch|update|pick|choose|select|increase|decrease|adjust|raise|lower)\b/
+  const valueTerms =
+    /\b(sum insured|insured value|insurance value|vehicle value|car value|coverage value|insured amount|sum insured value)\b/
+
+  if (
+    valueTerms.test(q) &&
+    (changeVerb.test(q) ||
+      wantChange.test(q) ||
+      /\b(more|less|higher|lower|again)\b/.test(q) ||
+      /\b(increase|decrease|change).{0,40}(sum insured|insured value|vehicle value)\b/.test(q) ||
+      /\b(sum insured|insured value|vehicle value).{0,40}(increase|decrease|change|again)\b/.test(q))
+  ) {
+    return 'sum-insured'
+  }
 
   if (
     (changeVerb.test(q) && /\b(plan|cover|coverage|policy type|comprehensive|third party)\b/.test(q)) ||

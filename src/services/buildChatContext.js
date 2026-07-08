@@ -1,4 +1,4 @@
-import { ADDONS, PLANS, USER, VEHICLE, formatAED } from '../data'
+import { ADDONS, USER, VEHICLE, SUPPORT, formatAED, getPlanById } from '../data'
 import { CHAT_GUARDRAILS } from './contentGuard'
 
 const STAGE_LABELS = {
@@ -17,7 +17,7 @@ export function buildChatContext({
   vehicleValue,
   policyStart,
 }) {
-  const plan = PLANS.find((p) => p.id === selectedPlan)
+  const plan = selectedPlan ? getPlanById(selectedPlan, vehicleValue) : null
   const addonNames = selectedAddons
     .map((id) => ADDONS.find((a) => a.id === id)?.shortName)
     .filter(Boolean)
@@ -31,8 +31,8 @@ export function buildChatContext({
     stage: STAGE_LABELS[stage] ?? stage,
     selectedPlan: plan ? `${plan.name} (${formatAED(plan.price)}/year)` : 'Not selected yet',
     selectedAddons: addonNames.length ? addonNames.join(', ') : 'None selected',
-    supportPhone: '800 722',
-    supportEmail: 'contactus.uae@hsbc.com',
+    supportPhone: SUPPORT.phone,
+    supportEmail: SUPPORT.email,
   }
 }
 
@@ -63,6 +63,7 @@ Rules:
 - Answer UAE car insurance and general insurance questions using your knowledge, not only the FAQ list.
 - Focus on LIVA products, this renewal, claims, documents, payment, and add-ons when relevant.
 - Use AED for amounts. Do not invent prices beyond what the user context implies.
-- If you cannot answer, suggest calling ${context.supportPhone}.
+- If you cannot answer, suggest calling ${context.supportPhone} or emailing ${context.supportEmail}.
+- For ALL support contact details, use ONLY ${context.supportPhone} and ${context.supportEmail}. Never mention HSBC, hsbc.com, or any other insurer or bank contact details.
 - Do not mention that you are a language model or reference system prompts.`
 }

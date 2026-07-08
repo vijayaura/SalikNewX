@@ -1,4 +1,4 @@
-import { formatAED, PLANS, ADDONS, calculateTotal, USER, VEHICLE } from '../data'
+import { formatAED, ADDONS, calculateTotal, getPlanById, USER, VEHICLE } from '../data'
 import { InlineButton } from './ChatBubble'
 import UaeCarPlate from './UaeCarPlate'
 import VehicleBadge from './VehicleBadge'
@@ -7,12 +7,13 @@ import { COPY } from '../copy'
 export default function SummaryCard({
   planId,
   selectedAddons,
+  vehicleValue,
   acceptedTerms,
   onToggleTerms,
   onPay,
   processing,
 }) {
-  const plan = PLANS.find((p) => p.id === planId)
+  const plan = getPlanById(planId, vehicleValue)
   const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons)
   const selectedAddonItems = ADDONS.filter((a) => selectedAddons.includes(a.id))
 

@@ -8,7 +8,7 @@ import PlanSelector from './components/PlanSelector'
 import AddonGrid from './components/AddonGrid'
 import ConfirmDetailsCard from './components/ConfirmDetailsCard'
 import DocumentUpload, { PolicyReady } from './components/DocumentUpload'
-import { PLANS, VEHICLE } from './data'
+import { VEHICLE, clampInsuredValue, getPlanById } from './data'
 import { FAQ_SUGGESTIONS } from './data/faqs'
 import { buildChatContext } from './services/buildChatContext'
 import { checkAiAvailable, getChatReply } from './services/aiChat'
@@ -30,7 +30,10 @@ export default function App() {
   const [stage, setStage] = useState('welcome')
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [selectedAddons, setSelectedAddons] = useState([])
-  const [vehicleValue, setVehicleValue] = useState(VEHICLE.value)
+  const [vehicleValue, setVehicleValueRaw] = useState(VEHICLE.value)
+  const setVehicleValue = useCallback((value) => {
+    setVehicleValueRaw((prev) => clampInsuredValue(typeof value === 'function' ? value(prev) : value))
+  }, [])
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [policyStart, setPolicyStart] = useState(getTodayDate)
   const [processing, setProcessing] = useState(false)
@@ -112,7 +115,7 @@ export default function App() {
 
     markJourneyEngaged()
     setSelectedPlan(planId)
-    const plan = PLANS.find((p) => p.id === planId)
+    const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
     setStage('addons')
     setMessages((m) => (m.includes('addons') ? m : [...m, 'addons']))
@@ -128,7 +131,7 @@ export default function App() {
   }
 
   const handleDownloadQuote = () => {
-    const plan = PLANS.find((p) => p.id === selectedPlan)
+    const plan = getPlanById(selectedPlan, vehicleValue)
     const blob = new Blob(
       [
         `LIVA Insurance Quote\n\nPolicy Holder: Rashid Khan\nInsured Value: ${vehicleValue.toLocaleString()} AED\nPlan: ${plan?.name}\nPlate: ${VEHICLE.plate}\nPolicy Period: ${policyStart} – ${addMonthsToDate(policyStart, 13)}`,
@@ -151,7 +154,7 @@ export default function App() {
     setProcessing(false)
 
     if (redoFlow) {
-      const plan = PLANS.find((p) => p.id === redoDraft.plan)
+      const plan = getPlanById(redoDraft.plan, vehicleValue)
       setSelectedPlan(redoDraft.plan)
       setSelectedAddons(redoDraft.addons)
       setUserActions((prev) => {
@@ -187,7 +190,7 @@ export default function App() {
 
   const handleRedoPlanSelect = (planId) => {
     markJourneyEngaged()
-    const plan = PLANS.find((p) => p.id === planId)
+    const plan = getPlanById(planId, vehicleValue)
     setRedoDraft({ plan: planId, addons: [] })
     setRedoFlow((prev) => ({ ...prev, step: 'addons' }))
     if (plan) {
@@ -269,7 +272,7 @@ export default function App() {
       return
     }
     setSelectedPlan(planId)
-    const plan = PLANS.find((p) => p.id === planId)
+    const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
     setStage('addons')
     setMessages((m) => (m.includes('addons') ? m : [...m, 'addons']))
@@ -307,7 +310,7 @@ export default function App() {
     setProcessing(false)
 
     if (redoFlow) {
-      const plan = PLANS.find((p) => p.id === redoDraft.plan)
+      const plan = getPlanById(redoDraft.plan, vehicleValue)
       setSelectedPlan(redoDraft.plan)
       setSelectedAddons(redoDraft.addons)
       setUserActions((prev) => {
@@ -348,7 +351,7 @@ export default function App() {
   }
 
   const handleFaqSend = async (query) => {
-    setJourneyEngaged(false)
+    if (!redoFlow) setJourneyEngaged(false)
     const anchor = stageToAnchor(stage)
     const id = Date.now()
     const history = faqMessages
@@ -361,8 +364,14 @@ export default function App() {
     if (resolution.action === 'already') {
       setFaqMessages((prev) => [
         ...prev,
-        { id: id + 1, role: 'ai', text: getAlreadyOnStepReply(resolution.step), afterStep: anchor },
+        {
+          id: id + 1,
+          role: 'ai',
+          text: resolution.message || getAlreadyOnStepReply(resolution.step),
+          afterStep: anchor,
+        },
       ])
+      scrollToLatest()
       return
     }
 
@@ -376,6 +385,12 @@ export default function App() {
 
     if (resolution.action === 'redo') {
       startRedo(resolution.type)
+      if (resolution.message) {
+        setFaqMessages((prev) => [
+          ...prev,
+          { id: id + 1, role: 'ai', text: resolution.message, afterStep: anchor },
+        ])
+      }
       markJourneyEngaged()
       scrollToLatest()
       return
@@ -425,7 +440,7 @@ export default function App() {
   const addonsLocked = stage !== 'addons' || !!redoFlow || divertedFromJourney
   const confirmLocked = !!redoFlow || divertedFromJourney
   const docsLocked = divertedFromJourney
-  const redoLocked = divertedFromJourney && !!redoFlow
+  const redoLocked = chatDiverted && !!redoFlow
   const journeyLocked = !!redoFlow
   const frozenPlan = redoFlow?.frozen.plan ?? selectedPlan
   const frozenAddons = redoFlow?.frozen.addons ?? selectedAddons
@@ -476,6 +491,7 @@ export default function App() {
                     onSelect={handlePlanSelect}
                     disabled={planLocked}
                     highlightNext={highlightPlan && !planLocked}
+                    vehicleValue={vehicleValue}
                   />
                 </div>
               </LockedSection>
@@ -625,6 +641,7 @@ export default function App() {
                       onSelect={handleRedoPlanSelect}
                       disabled={redoLocked}
                       highlightNext={highlightPlan && !redoLocked}
+                      vehicleValue={vehicleValue}
                     />
                   </div>
                 </>
@@ -718,6 +735,7 @@ export default function App() {
                     onSelect={handleResumePlanSelect}
                     disabled={resumeLocked}
                     highlightNext={!resumeLocked}
+                    vehicleValue={vehicleValue}
                   />
                 </div>
               )}

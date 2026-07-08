@@ -1,3 +1,5 @@
+import { SUPPORT } from '../data'
+
 export const FAQS = [
   {
     id: 'comprehensive',
@@ -60,7 +62,7 @@ export const FAQS = [
     keywords: ['contact', 'support', 'help', 'phone', 'email', 'call', 'customer service'],
     question: 'How can I contact support?',
     answer:
-      'Call 800 722 or email contactus.uae@hsbc.com. Our team is available to help with quotes, claims, and policy questions.',
+      `Call ${SUPPORT.phone} or email ${SUPPORT.email}. Our team is available to help with quotes, claims, and policy questions.`,
   },
   {
     id: 'vehicle-value',
