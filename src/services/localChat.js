@@ -1,4 +1,5 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
+import { GENERAL_KNOWLEDGE } from '../data/generalKnowledge'
 
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -64,6 +65,42 @@ function findBestFaq(query) {
   return bestScore >= 4 ? bestMatch : null
 }
 
+function scoreKnowledge(query, entry) {
+  const queryTokens = tokenize(query)
+  const normalized = query.toLowerCase()
+  const corpus = `${entry.answer} ${entry.keywords.join(' ')}`.toLowerCase()
+  let score = 0
+
+  for (const keyword of entry.keywords) {
+    if (normalized.includes(keyword)) {
+      score += keyword.length * 2
+    }
+  }
+
+  for (const token of queryTokens) {
+    if (corpus.includes(token)) {
+      score += token.length
+    }
+  }
+
+  return score
+}
+
+function findGeneralKnowledge(query) {
+  let bestMatch = null
+  let bestScore = 0
+
+  for (const entry of GENERAL_KNOWLEDGE) {
+    const score = scoreKnowledge(query, entry)
+    if (score > bestScore) {
+      bestScore = score
+      bestMatch = entry
+    }
+  }
+
+  return bestScore >= 4 ? bestMatch : null
+}
+
 function greetingReply(context) {
   return `Hi ${context.customerName}! I can help with your ${context.vehicle} renewal. You're at the ${context.stage} step with ${context.selectedPlan}. Ask me about plans, add-ons, documents, payment, or claims.`
 }
@@ -106,6 +143,10 @@ function contextReply(query, context) {
   return null
 }
 
+function unknownReply(context) {
+  return `I'm not sure about that, ${context.customerName}. I'm best with this renewal — plans, add-ons, payment, documents, and claims. Try a suggestion chip below, or call ${context.supportPhone} for anything else.`
+}
+
 export function getLocalChatReply(query, context) {
   const trimmed = query.trim()
   if (!trimmed) return FAQ_FALLBACK
@@ -126,7 +167,10 @@ export function getLocalChatReply(query, context) {
   const faq = findBestFaq(trimmed)
   if (faq) return faq.answer
 
-  return `I'm Aura, your LIVA assistant. For your ${context.vehicle} renewal I can help with plans, pricing, add-ons, documents, and claims. Try "What does Comprehensive cover?" or "How do I make a claim?"`
+  const general = findGeneralKnowledge(trimmed)
+  if (general) return general.answer
+
+  return unknownReply(context)
 }
 
 export function findFaqAnswer(query) {

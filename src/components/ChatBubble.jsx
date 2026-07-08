@@ -23,10 +23,10 @@ export default function ChatBubble({ role, children, delay = 0, scrollAnchor = f
 
       <div className={`max-w-[88%] ${isAI ? '' : 'text-right'}`}>
         <div
-          className={`rounded-xl px-3 py-2 text-[13px] leading-snug ${
+          className={`rounded-xl px-3 py-2 text-[13px] ${
             isAI
-              ? 'text-gray-800 rounded-tl-sm border border-gray-100 shadow-bubble-ai texture-bubble'
-              : 'bg-liva-orange text-white rounded-tr-sm shadow-bubble-user'
+              ? 'text-gray-800 rounded-tl-sm border border-gray-100 shadow-bubble-ai texture-bubble leading-relaxed'
+              : 'bg-liva-orange text-white rounded-tr-sm shadow-bubble-user leading-snug'
           }`}
         >
           {children}

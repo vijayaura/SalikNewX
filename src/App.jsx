@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight } from 'lucide-react'
 import Header from './components/Header'
 import ChatBubble, { UserAction } from './components/ChatBubble'
+import FormattedMessage from './components/FormattedMessage'
 import PlanSelector from './components/PlanSelector'
 import AddonGrid from './components/AddonGrid'
 import ConfirmDetailsCard from './components/ConfirmDetailsCard'
@@ -12,6 +13,7 @@ import { FAQ_SUGGESTIONS } from './data/faqs'
 import { buildChatContext } from './services/buildChatContext'
 import { checkAiAvailable, getChatReply } from './services/aiChat'
 import { detectRevisionIntent } from './services/localChat'
+import { getControversialFallback, isControversialQuery } from './services/contentGuard'
 import { getAlreadyOnStepReply, getPendingStep, getProceedCta, resolveRevisionIntent } from './services/journeyGuide'
 import ChatInput from './components/ChatInput'
 import MobileFrame from './components/MobileFrame'
@@ -82,7 +84,11 @@ export default function App() {
   }, [stage, messages, userActions, faqMessages, supportVisible, redoFlow, resumeFlow, scrollToLatest])
 
   useEffect(() => {
-    checkAiAvailable().then(setAiConnected)
+    checkAiAvailable(true).then(setAiConnected)
+    const interval = setInterval(() => {
+      checkAiAvailable(true).then(setAiConnected)
+    }, 15_000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -375,9 +381,6 @@ export default function App() {
       return
     }
 
-    setFaqTyping(true)
-    setFaqTypingAnchor(anchor)
-
     const context = buildChatContext({
       stage,
       selectedPlan,
@@ -386,7 +389,25 @@ export default function App() {
       policyStart,
     })
 
-    const { text } = await getChatReply(query, { history, context })
+    if (isControversialQuery(query)) {
+      setFaqMessages((prev) => [
+        ...prev,
+        { id: id + 1, role: 'ai', text: getControversialFallback(context), afterStep: anchor },
+      ])
+      scrollToLatest()
+      return
+    }
+
+    setFaqTyping(true)
+    setFaqTypingAnchor(anchor)
+
+    const { text, source } = await getChatReply(query, { history, context })
+
+    if (source === 'claude') {
+      setAiConnected(true)
+    } else if (source === 'error') {
+      setAiConnected(false)
+    }
 
     setFaqTyping(false)
     setFaqTypingAnchor(null)
@@ -836,7 +857,7 @@ function FaqThread({ messages, anchor, typing, activeAnchor }) {
     <>
       {thread.map((msg) => (
         <ChatBubble key={msg.id} role={msg.role} scrollAnchor>
-          {msg.text}
+          {msg.role === 'ai' ? <FormattedMessage text={msg.text} /> : msg.text}
         </ChatBubble>
       ))}
       {showTyping && (

@@ -1,68 +1,107 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
-import { buildSystemPrompt } from './buildChatContext'
+import { buildSystemPrompt as buildBaseSystemPrompt } from './buildChatContext'
+import { getControversialFallback, isControversialQuery } from './contentGuard'
 import { getLocalChatReply } from './localChat'
 
-const isDev = import.meta.env.DEV
-const configuredUrl = import.meta.env.VITE_OLLAMA_URL?.trim()
-const OLLAMA_URL = configuredUrl || (isDev ? '/api/ollama' : '')
-const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'llama3.2'
-const AI_ENABLED =
-  import.meta.env.VITE_AI_ENABLED !== 'false' && Boolean(OLLAMA_URL)
-const REQUEST_TIMEOUT_MS = 20_000
+const CHAT_API_URL = '/api/chat'
+const HEALTH_API_URL = '/api/chat/health'
+const AI_ENABLED = import.meta.env.VITE_AI_ENABLED !== 'false'
+const REQUEST_TIMEOUT_MS = 30_000
+
+const AZURE_SETUP_HINT =
+  'Your API key looks like Azure Foundry. Add ANTHROPIC_BASE_URL to .env (from the Azure portal), then restart the dev server.'
 
 function buildFaqKnowledge() {
   return FAQS.map((faq) => `- ${faq.question} ${faq.answer}`).join('\n')
 }
 
-function toOllamaMessages(history, query, systemPrompt) {
-  const messages = [{ role: 'system', content: systemPrompt }]
-
-  for (const msg of history.slice(-8)) {
-    messages.push({
-      role: msg.role === 'user' ? 'user' : 'assistant',
-      content: msg.text,
-    })
-  }
-
-  messages.push({ role: 'user', content: query })
-  return messages
+/** Map in-app chat rows to the API conversationHistory shape. */
+function toConversationHistory(history) {
+  return history.slice(-8).map((msg) => ({
+    role: msg.role === 'user' ? 'user' : 'assistant',
+    content: msg.text,
+  }))
 }
 
-async function callOllama(messages) {
+function buildFullSystemPrompt(context) {
+  return `${buildBaseSystemPrompt(context)}
+
+You can answer general real-world questions (UAE driving, Salik, insurance concepts, etc.) using your knowledge — not only the FAQ list below.
+When FAQ knowledge applies, prefer it for LIVA product facts.
+
+Always format replies with Markdown (**bold**, *italics*, "- " bullet lines, blank lines between sections).
+
+Reference knowledge (use when relevant):
+${buildFaqKnowledge()}`
+}
+
+/**
+ * Call POST /api/chat — Claude runs on the server; the API key never reaches the browser.
+ */
+async function callClaudeChat(message, conversationHistory, systemPrompt) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    const response = await fetch(CHAT_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages,
-        stream: false,
-        options: {
-          temperature: 0.35,
-          num_predict: 220,
-        },
-      }),
+      body: JSON.stringify({ message, conversationHistory, systemPrompt }),
       signal: controller.signal,
     })
 
+    const data = await response.json().catch(() => ({}))
+
     if (!response.ok) {
-      throw new Error(`Ollama responded with ${response.status}`)
+      throw new Error(data.error || `Chat error ${response.status}`)
     }
 
-    const data = await response.json()
-    const content = data.message?.content?.trim()
+    const text = data.response?.trim()
+    if (!text) throw new Error('Claude returned an empty response')
 
-    if (!content) {
-      throw new Error('Ollama returned an empty response')
-    }
-
-    return content
+    return text
   } finally {
     clearTimeout(timeout)
   }
+}
+
+let aiReady = null
+
+async function fetchAiHealth(force = false) {
+  if (!AI_ENABLED) {
+    aiReady = false
+    return false
+  }
+
+  if (!force && aiReady !== null) return aiReady
+
+  try {
+    const response = await fetch(HEALTH_API_URL, {
+      signal: AbortSignal.timeout(4000),
+    })
+    if (!response.ok) {
+      aiReady = false
+      return false
+    }
+
+    const data = await response.json()
+    aiReady = Boolean(data.ok)
+    return aiReady
+  } catch {
+    aiReady = false
+    return false
+  }
+}
+
+export async function getAiSetupHint() {
+  try {
+    const response = await fetch(HEALTH_API_URL, { signal: AbortSignal.timeout(4000) })
+    const data = await response.json()
+    if (data.needsBaseUrl) return AZURE_SETUP_HINT
+  } catch {
+    /* ignore */
+  }
+  return null
 }
 
 export async function getChatReply(query, { history = [], context }) {
@@ -71,46 +110,57 @@ export async function getChatReply(query, { history = [], context }) {
     return { text: FAQ_FALLBACK, source: 'fallback' }
   }
 
-  if (!AI_ENABLED) {
-    return { text: getLocalChatReply(trimmed, context), source: 'local' }
+  const localReply = () => ({ text: getLocalChatReply(trimmed, context), source: 'local' })
+
+  if (isControversialQuery(trimmed)) {
+    return { text: getControversialFallback(context), source: 'guard' }
   }
 
-  const systemPrompt = `${buildSystemPrompt(context)}
-
-Reference knowledge (use when relevant):
-${buildFaqKnowledge()}`
+  if (!AI_ENABLED) {
+    return localReply()
+  }
 
   try {
-    const messages = toOllamaMessages(history, trimmed, systemPrompt)
-    const text = await callOllama(messages)
-    return { text, source: 'ollama' }
-  } catch {
-    return { text: getLocalChatReply(trimmed, context), source: 'local' }
+    const conversationHistory = toConversationHistory(history)
+    const systemPrompt = buildFullSystemPrompt(context)
+    const text = await callClaudeChat(trimmed, conversationHistory, systemPrompt)
+
+    aiReady = true
+    return { text, source: 'claude' }
+  } catch (error) {
+    aiReady = false
+
+    const isTimeout = error?.name === 'AbortError'
+    const local = getLocalChatReply(trimmed, context)
+    const hasLocalAnswer = !/I'm not sure about that/i.test(local)
+
+    if (hasLocalAnswer) {
+      return { text: local, source: 'local' }
+    }
+
+    if (isTimeout) {
+      return {
+        text: 'That took too long — please try again in a moment.',
+        source: 'error',
+      }
+    }
+
+    const setupHint = await getAiSetupHint()
+    if (setupHint) {
+      return { text: setupHint, source: 'error' }
+    }
+
+    return {
+      text: error?.message || 'Something went wrong reaching Claude. Please try again.',
+      source: 'error',
+    }
   }
 }
 
-export async function checkAiAvailable() {
-  if (!AI_ENABLED) return false
-
-  try {
-    const response = await fetch(`${OLLAMA_URL}/api/tags`, {
-      signal: AbortSignal.timeout(3000),
-    })
-    if (!response.ok) return false
-
-    const data = await response.json()
-    const models = data.models ?? []
-    const hasModel = models.some((m) => {
-      const name = m.name ?? ''
-      return name === OLLAMA_MODEL || name.startsWith(`${OLLAMA_MODEL}:`)
-    })
-
-    return hasModel || models.length > 0
-  } catch {
-    return false
-  }
+export async function checkAiAvailable(force = false) {
+  return fetchAiHealth(force)
 }
 
 export function getChatMode() {
-  return AI_ENABLED ? 'ollama-capable' : 'local'
+  return AI_ENABLED ? 'claude' : 'local'
 }
