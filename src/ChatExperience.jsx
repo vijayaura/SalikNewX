@@ -525,7 +525,7 @@ export default function ChatExperience({ embedHost = false }) {
           {messages.includes('plan') && resumeFlow?.step !== 'plan' && (
             <motion.div key="plan" data-journey="plan" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={planLocked}>
-                <div className="ml-9">
+                <div>
                   <PlanSelector
                     selectedPlan={frozenPlan}
                     onSelect={handlePlanSelect}
@@ -676,7 +676,7 @@ export default function ChatExperience({ embedHost = false }) {
                   <ChatBubble role="ai">
                     <IntroMessage value={vehicleValue} onValueChange={setVehicleValue} />
                   </ChatBubble>
-                  <div className="ml-9">
+                  <div>
                     <PlanSelector
                       selectedPlan={activePlanId}
                       onSelect={handleRedoPlanSelect}
@@ -771,7 +771,7 @@ export default function ChatExperience({ embedHost = false }) {
               className="space-y-2"
             >
               {resumeFlow.step === 'plan' && (
-                <div className="ml-9">
+                <div>
                   <PlanSelector
                     selectedPlan={redoFlow ? activePlanId : selectedPlan}
                     onSelect={handleResumePlanSelect}
