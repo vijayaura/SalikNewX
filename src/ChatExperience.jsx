@@ -8,7 +8,7 @@ import PlanSelector from './components/PlanSelector'
 import AddonGrid from './components/AddonGrid'
 import ConfirmDetailsCard from './components/ConfirmDetailsCard'
 import DocumentUpload, { PolicyReady } from './components/DocumentUpload'
-import { VEHICLE, clampInsuredValue, getPlanById } from './data'
+import { VEHICLE, clampInsuredValue, getPlanById, getStepAfterPlanSelect, isComprehensivePlan } from './data'
 import { FAQ_SUGGESTIONS } from './data/faqs'
 import { buildChatContext } from './services/buildChatContext'
 import { checkAiAvailable, getChatReply } from './services/aiChat'
@@ -121,10 +121,24 @@ export default function ChatExperience({ embedHost = false }) {
 
     markJourneyEngaged()
     setSelectedPlan(planId)
+    if (!isComprehensivePlan(planId)) {
+      setSelectedAddons([])
+    }
     const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
-    setStage('addons')
-    setMessages((m) => (m.includes('addons') ? m : [...m, 'addons']))
+
+    const nextStage = getStepAfterPlanSelect(planId)
+    setStage(nextStage)
+    setMessages((m) => {
+      const next = [...m]
+      if (nextStage === 'addons' && !next.includes('addons')) next.push('addons')
+      if (nextStage === 'confirm' && !next.includes('confirm')) next.push('confirm')
+      return next
+    })
+    if (nextStage === 'confirm') {
+      setDetailsExpanded(false)
+      setPolicyStart(getTodayDate())
+    }
   }
 
   const handleConfirmAddons = () => {
@@ -188,7 +202,7 @@ export default function ChatExperience({ embedHost = false }) {
       return
     }
 
-    if (type === 'addons' && selectedPlan) {
+    if (type === 'addons' && selectedPlan && isComprehensivePlan(selectedPlan)) {
       setRedoFlow({ step: 'addons', frozen })
       setRedoDraft({ plan: selectedPlan, addons: [] })
     }
@@ -197,14 +211,22 @@ export default function ChatExperience({ embedHost = false }) {
   const handleRedoPlanSelect = (planId) => {
     markJourneyEngaged()
     const plan = getPlanById(planId, vehicleValue)
+    const nextStep = getStepAfterPlanSelect(planId)
     setRedoDraft({ plan: planId, addons: [] })
-    setRedoFlow((prev) => ({ ...prev, step: 'addons' }))
+    setRedoFlow((prev) => ({ ...prev, step: nextStep }))
     if (plan) {
       setUserActions((prev) => {
         const next = [...prev]
         next[0] = COPY.user.plan(plan.name)
+        if (nextStep === 'confirm') {
+          next[1] = COPY.user.addons(0)
+        }
         return next.length ? next : [COPY.user.plan(plan.name)]
       })
+    }
+    if (nextStep === 'confirm') {
+      setDetailsExpanded(false)
+      setPolicyStart(getTodayDate())
     }
   }
 
@@ -272,17 +294,30 @@ export default function ChatExperience({ embedHost = false }) {
   }, [stage, redoFlow, presentResumeStep])
 
   const handleResumePlanSelect = (planId) => {
+    const nextStep = getStepAfterPlanSelect(planId)
     if (redoFlow) {
       handleRedoPlanSelect(planId)
-      presentResumeStep('addons')
+      presentResumeStep(nextStep)
       return
     }
     setSelectedPlan(planId)
+    if (!isComprehensivePlan(planId)) {
+      setSelectedAddons([])
+    }
     const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
-    setStage('addons')
-    setMessages((m) => (m.includes('addons') ? m : [...m, 'addons']))
-    presentResumeStep('addons')
+    setStage(nextStep)
+    setMessages((m) => {
+      const next = [...m]
+      if (nextStep === 'addons' && !next.includes('addons')) next.push('addons')
+      if (nextStep === 'confirm' && !next.includes('confirm')) next.push('confirm')
+      return next
+    })
+    if (nextStep === 'confirm') {
+      setDetailsExpanded(false)
+      setPolicyStart(getTodayDate())
+    }
+    presentResumeStep(nextStep)
   }
 
   const handleResumeConfirmAddons = () => {
@@ -512,7 +547,7 @@ export default function ChatExperience({ embedHost = false }) {
         />
 
         <AnimatePresence>
-          {messages.includes('addons') && resumeFlow?.step !== 'addons' && (
+          {messages.includes('addons') && isComprehensivePlan(frozenPlan) && resumeFlow?.step !== 'addons' && (
             <motion.div key="addons" data-journey="addons" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={journeyLocked}>
                 <UserAction delay={0}>{userActions[0]}</UserAction>
@@ -523,6 +558,7 @@ export default function ChatExperience({ embedHost = false }) {
                 </ChatBubble>
                 <div className="ml-9">
                   <AddonGrid
+                    planId={frozenPlan}
                     selectedAddons={frozenAddons}
                     onToggle={toggleAddon}
                     disabled={addonsLocked}
@@ -546,7 +582,7 @@ export default function ChatExperience({ embedHost = false }) {
           {messages.includes('confirm') && resumeFlow?.step !== 'confirm' && (
             <motion.div key="confirm" data-journey="confirm" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={confirmLocked}>
-                <UserAction delay={0}>{userActions[1]}</UserAction>
+                <UserAction delay={0}>{userActions[1] ?? userActions[0]}</UserAction>
                 <ChatBubble role="ai">
                   <ConfirmIntroMessage />
                 </ChatBubble>
@@ -652,13 +688,14 @@ export default function ChatExperience({ embedHost = false }) {
                 </>
               )}
 
-              {redoFlow.step === 'addons' && (
+              {redoFlow.step === 'addons' && isComprehensivePlan(activePlanId) && (
                 <>
                   <ChatBubble role="ai">
                     <AddonsIntroMessage />
                   </ChatBubble>
                   <div className="ml-9">
                     <AddonGrid
+                      planId={activePlanId}
                       selectedAddons={activeAddons}
                       onToggle={handleRedoToggleAddon}
                       disabled={redoLocked}
@@ -753,6 +790,7 @@ export default function ChatExperience({ embedHost = false }) {
                   </ChatBubble>
                   <div className="ml-9">
                     <AddonGrid
+                      planId={redoFlow ? activePlanId : selectedPlan}
                       selectedAddons={redoFlow ? activeAddons : selectedAddons}
                       onToggle={handleResumeToggleAddon}
                       disabled={resumeLocked}
@@ -765,7 +803,9 @@ export default function ChatExperience({ embedHost = false }) {
 
               {resumeFlow.step === 'confirm' && (
                 <>
-                  {userActions[1] && <UserAction delay={0}>{userActions[1]}</UserAction>}
+                  {userActions[1] ?? userActions[0] ? (
+                    <UserAction delay={0}>{userActions[1] ?? userActions[0]}</UserAction>
+                  ) : null}
                   <ChatBubble role="ai">
                     <ConfirmIntroMessage />
                   </ChatBubble>

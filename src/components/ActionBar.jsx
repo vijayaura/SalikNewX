@@ -10,7 +10,7 @@ export default function ActionBar({
   processing,
 }) {
   const plan = getPlanById(planId, vehicleValue)
-  const { total } = calculateTotal(plan?.price ?? 0, selectedAddons)
+  const { total } = calculateTotal(plan?.price ?? 0, selectedAddons, planId)
 
   const config = {
     welcome: null,
@@ -61,7 +61,7 @@ export default function ActionBar({
 
 export function LiveTotal({ planId, selectedAddons, vehicleValue, visible }) {
   const plan = getPlanById(planId, vehicleValue)
-  const { total } = calculateTotal(plan?.price ?? 0, selectedAddons)
+  const { total } = calculateTotal(plan?.price ?? 0, selectedAddons, planId)
 
   if (!visible || !planId) return null
 

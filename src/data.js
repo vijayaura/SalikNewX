@@ -48,27 +48,50 @@ export const VALUE_LIMITS = getValueLimits(VEHICLE.value)
 
 export const PLANS = [
   {
-    id: 'comprehensive',
-    name: 'Comprehensive',
-    /** Base premium at VEHICLE.value — scaled proportionally when sum insured changes. */
-    price: 1200,
-    recommended: true,
-    features: ['Full damage cover', 'Theft protection', 'Natural calamities'],
+    id: 'agency',
+    name: 'Agency',
+    subtitle: 'Authorized dealer repairs',
+    /** Base premium at VEHICLE.value — scales when sum insured changes. */
+    price: 2110,
+    scalesWithSumInsured: true,
+    recommended: false,
+    badge: null,
+    features: ['Genuine OEM parts', 'Dealer workshops'],
     covers: [
       'Own damage cover',
       'Theft & fire protection',
-      'Natural calamities',
+      'Authorized dealer repairs',
       'Third party liability',
-      'Personal accident benefit',
+      'Natural calamities',
+    ],
+  },
+  {
+    id: 'non-agency',
+    name: 'Non-Agency',
+    subtitle: 'Repair at any garage',
+    price: 1860,
+    scalesWithSumInsured: true,
+    recommended: true,
+    badge: 'POPULAR',
+    features: ['Any garage you trust', 'Theft & fire included'],
+    covers: [
+      'Own damage cover',
+      'Theft & fire protection',
+      'Repair at any garage',
+      'Third party liability',
+      'Natural calamities',
     ],
   },
   {
     id: 'third-party',
-    name: 'Third Party Liability',
-    /** Base premium at VEHICLE.value — scaled proportionally when sum insured changes. */
-    price: 1000,
+    name: 'Third Party',
+    subtitle: 'Legal minimum cover',
+    /** Fixed premium — does not change with sum insured. */
+    price: 750,
+    scalesWithSumInsured: false,
     recommended: false,
-    features: ['Legal liability', 'Third-party damage', 'Basic protection'],
+    badge: 'BY LAW',
+    features: ['Covers others\' damage', 'Lowest annual price'],
     covers: [
       'Third party bodily injury',
       'Third party property damage',
@@ -77,48 +100,43 @@ export const PLANS = [
   },
 ]
 
+/** Comprehensive = Agency or Non-Agency (add-ons available). */
+export function isComprehensivePlan(planId) {
+  return planId === 'agency' || planId === 'non-agency'
+}
+
 export const ADDONS = [
   {
-    id: 'driver-pa',
-    name: 'Personal Accident — Driver',
-    shortName: 'Driver PA',
-    desc: 'Medical & death benefit for you',
-    price: 60,
-  },
-  {
-    id: 'passenger-pa',
-    name: 'Personal Accident Passengers',
-    shortName: 'Passenger PA',
-    desc: 'Cover for everyone in the car',
-    price: 60,
+    id: 'gcc',
+    name: 'Territory extended to other GCC countries',
+    shortName: 'GCC Territory Extension',
+    desc: 'Drive across the Gulf',
+    price: 500,
+    comprehensiveOnly: true,
   },
   {
     id: 'ncd',
     name: 'No Claims Discount Protection',
     shortName: 'NCD Protection',
     desc: 'Keep your discount after a claim',
-    price: 60,
+    price: 250,
+    comprehensiveOnly: true,
   },
   {
-    id: 'breakdown',
-    name: '24h Accident & Breakdown Recovery',
-    shortName: 'Breakdown Recovery',
-    desc: 'Roadside help, anytime',
-    price: 60,
-  },
-  {
-    id: 'gcc',
-    name: 'GCC Territory Extension',
-    shortName: 'GCC Extension',
-    desc: 'Drive across the Gulf',
-    price: 60,
+    id: 'rent-a-car',
+    name: 'Premium Rent A Car',
+    shortName: 'Premium Rent A Car',
+    desc: 'Replacement vehicle while yours is in repair',
+    price: 200,
+    comprehensiveOnly: true,
   },
   {
     id: 'offroad',
     name: 'Off Road Cover',
     shortName: 'Off-Road Cover',
     desc: 'Desert & trail driving',
-    price: 60,
+    price: 250,
+    comprehensiveOnly: true,
   },
 ]
 
@@ -128,10 +146,11 @@ export function formatAED(amount) {
   return `${amount.toLocaleString('en-AE')} AED`
 }
 
-/** Scale a plan premium proportionally to the current sum insured. */
+/** Scale a plan premium proportionally to sum insured (comprehensive plans only). */
 export function getPlanPrice(planId, vehicleValue = VEHICLE.value) {
   const plan = PLANS.find((p) => p.id === planId)
   if (!plan) return 0
+  if (plan.scalesWithSumInsured === false) return plan.price
   return Math.round(plan.price * (vehicleValue / VEHICLE.value))
 }
 
@@ -146,6 +165,20 @@ export function getPlansWithPricing(vehicleValue = VEHICLE.value) {
     ...plan,
     price: getPlanPrice(plan.id, vehicleValue),
   }))
+}
+
+export function getAddonsForPlan(planId) {
+  if (!isComprehensivePlan(planId)) return []
+  return ADDONS
+}
+
+export function getSelectedAddonItems(planId, addonIds) {
+  const allowed = new Set(getAddonsForPlan(planId).map((a) => a.id))
+  return ADDONS.filter((a) => allowed.has(a.id) && addonIds.includes(a.id))
+}
+
+export function getStepAfterPlanSelect(planId) {
+  return isComprehensivePlan(planId) ? 'addons' : 'confirm'
 }
 
 export function clampInsuredValue(value, limits = VALUE_LIMITS) {
@@ -207,11 +240,9 @@ export function getDaysUntilExpiry(dateStr) {
   return Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-export function calculateTotal(planPrice, addonIds) {
-  const addonsTotal = ADDONS.filter((a) => addonIds.includes(a.id)).reduce(
-    (sum, a) => sum + a.price,
-    0,
-  )
+export function calculateTotal(planPrice, addonIds, planId) {
+  const addonItems = planId ? getSelectedAddonItems(planId, addonIds) : ADDONS.filter((a) => addonIds.includes(a.id))
+  const addonsTotal = addonItems.reduce((sum, a) => sum + a.price, 0)
   const subtotal = planPrice + addonsTotal
   const vat = Math.round(subtotal * VAT_RATE)
   return { subtotal, vat, total: subtotal + vat, addonsTotal }

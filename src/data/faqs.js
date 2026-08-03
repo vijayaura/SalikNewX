@@ -3,24 +3,24 @@ import { SUPPORT } from '../data'
 export const FAQS = [
   {
     id: 'comprehensive',
-    keywords: ['comprehensive', 'full cover', 'what is covered', 'coverage', 'cover include'],
+    keywords: ['comprehensive', 'agency', 'non-agency', 'full cover', 'what is covered', 'coverage', 'cover include'],
     question: 'What does Comprehensive cover?',
     answer:
-      'Comprehensive covers own damage, theft, fire, natural calamities, third party liability, and personal accident benefits. It is our most complete plan for your vehicle.',
+      'Agency Comprehensive covers repairs at authorized dealers with genuine OEM parts. Non-Agency Comprehensive lets you repair at any garage and includes theft & fire. Both cover own damage, third party liability, and natural calamities.',
   },
   {
     id: 'third-party',
-    keywords: ['third party', 'third-party', 'difference', 'compare plans', 'liability only'],
-    question: 'What is Third Party Liability?',
+    keywords: ['third party', 'third-party', 'difference', 'compare plans', 'liability only', 'by law'],
+    question: 'What is Third Party cover?',
     answer:
-      'Third Party Liability covers damage or injury you cause to others. It does not cover damage to your own vehicle. Comprehensive includes third party cover plus protection for your car.',
+      'Third Party is the legal minimum — it covers damage or injury you cause to others, not your own vehicle. Agency and Non-Agency Comprehensive also protect your car. Optional upgrades are available on comprehensive plans only.',
   },
   {
     id: 'addons',
-    keywords: ['addon', 'add-on', 'upgrade', 'optional', 'extra cover', 'off road', 'gcc', 'breakdown'],
+    keywords: ['addon', 'add-on', 'upgrade', 'optional', 'extra cover', 'off road', 'gcc', 'rent a car', 'ncd'],
     question: 'What are optional upgrades?',
     answer:
-      'Upgrades include Personal Accident (driver & passengers), No Claims Discount protection, 24h breakdown recovery, GCC territory extension, and Off Road cover. Each add-on is 60 AED.',
+      'Optional upgrades are available on comprehensive plans only: GCC territory extension (500 AED), NCD Protection (250 AED), Premium Rent A Car (200 AED), and Off Road cover (250 AED).',
   },
   {
     id: 'documents',
@@ -78,6 +78,6 @@ export const FAQ_FALLBACK =
 
 export const FAQ_SUGGESTIONS = [
   'What does Comprehensive cover?',
-  'What documents do I need?',
+  'What is Third Party cover?',
   'How do I make a claim?',
 ]

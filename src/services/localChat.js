@@ -109,7 +109,7 @@ function contextReply(query, context) {
   const lower = query.toLowerCase()
 
   if (/\b(my plan|which plan|current plan|selected plan|plan i (?:chose|picked|selected)|what plan)\b/.test(lower)) {
-    return `You've selected ${context.selectedPlan} for your ${context.vehicle} (sum insured ${context.insuredValue}). Comprehensive gives full damage cover; Third Party covers others only. You can switch plans anytime before payment.`
+    return `You've selected ${context.selectedPlan} for your ${context.vehicle} (sum insured ${context.insuredValue}). Agency and Non-Agency Comprehensive cover your car; Third Party covers others only. You can switch plans anytime before payment.`
   }
 
   if (/\b(how much|total|premium|price|cost|pay|payment)\b/.test(lower)) {
@@ -121,7 +121,7 @@ function contextReply(query, context) {
   }
 
   if (/\b(addon|add-on|upgrade|optional|extra)\b/.test(lower)) {
-    return `Optional add-ons are 60 AED each — Personal Accident, NCD Protection, breakdown recovery, GCC extension, and Off Road cover. Your current add-ons: ${context.selectedAddons}.`
+    return `Optional upgrades are available on comprehensive plans only — GCC extension, NCD Protection, Premium Rent A Car, and Off Road cover. Your current add-ons: ${context.selectedAddons}.`
   }
 
   if (/\b(document|upload|emirates id|license|papers)\b/.test(lower)) {

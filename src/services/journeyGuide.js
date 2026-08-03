@@ -1,3 +1,5 @@
+import { isComprehensivePlan } from '../data'
+
 export function getProceedCta({ stage, redoFlow }) {
   if (stage === 'welcome' || stage === 'complete') return null
 
@@ -67,7 +69,7 @@ export function resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan 
         action: 'already',
         step: 'plan',
         message:
-          'Use the **+** and **−** buttons next to your sum insured above — plan prices update automatically as you adjust it.',
+          'Use the **+** and **−** buttons next to your sum insured above — **Agency** and **Non-Agency** premiums update automatically (Third Party stays fixed).',
       }
     }
 
@@ -76,7 +78,7 @@ export function resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan 
         action: 'already',
         step: 'plan',
         message:
-          'Adjust your sum insured with the **+** and **−** buttons above, then pick your plan again — premiums update with the new value.',
+          'Adjust your sum insured with the **+** and **−** buttons above, then pick your plan again — comprehensive premiums update with the new value.',
       }
     }
 
@@ -84,7 +86,7 @@ export function resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan 
       action: 'redo',
       type: 'plan',
       message:
-        'No problem! Adjust your sum insured below and select your plan again — premiums will update based on the new value.',
+        'No problem! Adjust your sum insured below and select your plan again — comprehensive premiums update based on the new value.',
     }
   }
 
@@ -115,6 +117,14 @@ export function resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan 
     ((['addons', 'confirm'].includes(stage) && !redoFlow) || (redoFlow && redoFlow.step !== 'plan'))
   ) {
     return { action: 'redo', type: 'plan' }
+  }
+
+  if (revision === 'addons' && selectedPlan && !isComprehensivePlan(selectedPlan)) {
+    return {
+      action: 'blocked',
+      message:
+        'Optional upgrades are available on **Agency** and **Non-Agency Comprehensive** plans only. Switch to a comprehensive plan to add upgrades.',
+    }
   }
 
   if (revision === 'addons' && (stage === 'confirm' || redoFlow?.step === 'confirm')) {

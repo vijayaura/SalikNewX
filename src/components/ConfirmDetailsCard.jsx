@@ -12,6 +12,7 @@ import {
   formatVehicleLabel,
   fromInputDate,
   getPlanById,
+  getSelectedAddonItems,
   getTodayDate,
   toInputDate,
 } from '../data'
@@ -39,8 +40,8 @@ export default function ConfirmDetailsCard({
   const [emiratesIdExpiry, setEmiratesIdExpiry] = useState(USER.emiratesIdExpiry)
 
   const plan = getPlanById(planId, vehicleValue)
-  const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons)
-  const selectedAddonItems = ADDONS.filter((a) => selectedAddons.includes(a.id))
+  const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons, planId)
+  const selectedAddonItems = getSelectedAddonItems(planId, selectedAddons)
   const policyEnd = addMonthsToDate(policyStart, 13)
   const minPolicyStart = toInputDate(getTodayDate())
 

@@ -1,4 +1,4 @@
-import { formatAED, ADDONS, calculateTotal, getPlanById, USER, VEHICLE } from '../data'
+import { formatAED, calculateTotal, getPlanById, getSelectedAddonItems, USER, VEHICLE } from '../data'
 import { InlineButton } from './ChatBubble'
 import UaeCarPlate from './UaeCarPlate'
 import VehicleBadge from './VehicleBadge'
@@ -14,8 +14,8 @@ export default function SummaryCard({
   processing,
 }) {
   const plan = getPlanById(planId, vehicleValue)
-  const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons)
-  const selectedAddonItems = ADDONS.filter((a) => selectedAddons.includes(a.id))
+  const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons, planId)
+  const selectedAddonItems = getSelectedAddonItems(planId, selectedAddons)
 
   return (
     <div className="card mt-1 divide-y divide-gray-200/80 overflow-hidden">
