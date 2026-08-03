@@ -26,6 +26,10 @@
     overscroll-behavior: none;
   }
 
+  body:has(.embed-root) {
+    @apply bg-white;
+  }
+
   ::-webkit-scrollbar {
     width: 0;
     height: 0;
