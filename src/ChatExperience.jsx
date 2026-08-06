@@ -47,6 +47,7 @@ export default function ChatExperience({ embedHost = false }) {
   const [aiConnected, setAiConnected] = useState(false)
   const [supportLoading, setSupportLoading] = useState(false)
   const [supportVisible, setSupportVisible] = useState(false)
+  const [supportRequestKey, setSupportRequestKey] = useState(0)
   const [journeyEngaged, setJourneyEngaged] = useState(false)
   const [resumeFlow, setResumeFlow] = useState(null)
   const chatRef = useRef(null)
@@ -387,6 +388,7 @@ export default function ChatExperience({ embedHost = false }) {
     scrollToLatest()
     await delay(700)
     setSupportLoading(false)
+    setSupportRequestKey((k) => k + 1)
     setSupportVisible(true)
     scrollToLatest()
   }
@@ -748,7 +750,7 @@ export default function ChatExperience({ embedHost = false }) {
               className="ml-9"
               data-scroll-anchor
             >
-              <SupportCallbackCard />
+              <SupportCallbackCard key={supportRequestKey} />
             </motion.div>
           )}
         </AnimatePresence>
