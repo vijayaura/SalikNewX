@@ -1,11 +1,6 @@
-import MobileFrame from '../components/MobileFrame'
-import ChatExperience from '../ChatExperience'
+import DemoOrchestrator from '../components/DemoOrchestrator'
 
-/** Full marketing demo — homepage at / */
+/** CEO demo — WhatsApp → consent → three journeys */
 export default function DemoPage() {
-  return (
-    <MobileFrame>
-      <ChatExperience />
-    </MobileFrame>
-  )
+  return <DemoOrchestrator />
 }

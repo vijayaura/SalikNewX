@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { Calendar, Clock, Headset, Phone, Video } from 'lucide-react'
 import { USER, formatDisplayDate, fromInputDate, getTodayDate, toInputDate } from '../data'
 import SupportGoogleMeet from './SupportGoogleMeet'
-import SupportVideoCall from './SupportVideoCall'
 
 function formatUaeMobile(mobile) {
   const digits = mobile.replace(/\D/g, '')
@@ -42,7 +41,7 @@ const PHONE_CALLBACK_OPTIONS = [
   {
     id: 'now',
     label: 'Call now',
-    desc: 'Video call with an advisor instantly',
+    desc: 'Live video with your advisor in the app',
     Icon: Phone,
   },
   {
@@ -134,7 +133,7 @@ function OnTheWayIndicator() {
   )
 }
 
-export default function SupportCallbackCard({ onClose, planHint }) {
+export default function SupportCallbackCard({ onClose, planHint, onTeamsCallNow }) {
   const [step, setStep] = useState('choose')
   const [choice, setChoice] = useState(null)
   const [scheduleDate, setScheduleDate] = useState(toInputDate(getTodayDate()))
@@ -146,7 +145,10 @@ export default function SupportCallbackCard({ onClose, planHint }) {
   const handleChoose = (optionId) => {
     setChoice(optionId)
     if (optionId === 'now') {
-      setStep('video-call')
+      if (onTeamsCallNow) {
+        onTeamsCallNow()
+        return
+      }
       return
     }
     if (optionId === 'meet') {
@@ -160,18 +162,8 @@ export default function SupportCallbackCard({ onClose, planHint }) {
     setStep('confirmed')
   }
 
-  const handleEndVideoCall = () => {
-    setChoice(null)
-    if (onClose) onClose()
-    else setStep('choose')
-  }
-
   const handleConfirmSchedule = () => {
     setStep('confirmed')
-  }
-
-  if (step === 'video-call') {
-    return <SupportVideoCall onEndCall={handleEndVideoCall} />
   }
 
   if (step === 'google-meet') {

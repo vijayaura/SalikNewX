@@ -13,6 +13,7 @@ export default {
       },
       fontFamily: {
         sans: ['system-ui', '-apple-system', 'sans-serif'],
+        display: ['Outfit', 'system-ui', 'sans-serif'],
       },
     },
   },

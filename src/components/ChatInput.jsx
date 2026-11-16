@@ -63,8 +63,8 @@ export default function ChatInput({
               disabled={disabled}
               placeholder={
                 aiConnected
-                  ? 'Ask Aura anything…'
-                  : 'Ask Aura about plans, Salik, claims, docs…'
+                  ? 'Ask us…'
+                  : 'Ask us about plans, Salik, claims, docs…'
               }
               className="flex-1 min-w-0 bg-transparent py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
             />

@@ -1,7 +1,7 @@
 const DEMO_HIGHLIGHTS = [
   {
     label: 'Spin wheel',
-    description: 'Jackpot modal after a few seconds — win add-ons or a premium discount.',
+    description: 'Tap the Spin tab on the phone — win add-ons or a premium discount.',
   },
   {
     label: 'Call now',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Header from './components/Header'
 import ChatBubble, { UserAction } from './components/ChatBubble'
 import FormattedMessage from './components/FormattedMessage'
@@ -31,6 +31,7 @@ import AddonsIntroMessage from './components/AddonsIntroMessage'
 import ConfirmIntroMessage from './components/ConfirmIntroMessage'
 import PaymentMessage from './components/PaymentMessage'
 import SupportCallbackCard from './components/SupportCallbackCard'
+import SupportAuraCall from './components/SupportAuraCall'
 import PoweredByInster from './components/PoweredByInster'
 import JackpotWheelModal from './components/JackpotWheelModal'
 import WheelCornerTab from './components/WheelCornerTab'
@@ -38,7 +39,9 @@ import UiRenewalFlow from './components/UiRenewalFlow'
 import { COPY } from './copy'
 import { addMonthsToDate, getTodayDate } from './data'
 
-export default function ChatExperience({ embedHost = false }) {
+/** @typedef {'chat' | 'ui'} PresentationMode */
+
+export default function ChatExperience({ embedHost = false, presentationMode }) {
   const [stage, setStage] = useState('welcome')
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [selectedAddons, setSelectedAddons] = useState([])
@@ -61,9 +64,15 @@ export default function ChatExperience({ embedHost = false }) {
   const [supportLoading, setSupportLoading] = useState(false)
   const [supportVisible, setSupportVisible] = useState(false)
   const [supportRequestKey, setSupportRequestKey] = useState(0)
+  const [videoCallActive, setVideoCallActive] = useState(false)
   const [journeyEngaged, setJourneyEngaged] = useState(false)
   const [resumeFlow, setResumeFlow] = useState(null)
-  const [flowMode, setFlowMode] = useState('chat')
+  const [flowModeState, setFlowModeState] = useState('chat')
+  const [flowOverride, setFlowOverride] = useState(null)
+  const flowMode =
+    flowOverride ??
+    (presentationMode === 'chat' || presentationMode === 'ui' ? presentationMode : flowModeState)
+  const showFlowToggle = !presentationMode
   const [uiStage, setUiStage] = useState('plan')
   const [uiSelectedPlan, setUiSelectedPlan] = useState('agency')
   const [uiSelectedAddons, setUiSelectedAddons] = useState([])
@@ -77,35 +86,17 @@ export default function ChatExperience({ embedHost = false }) {
   const [premiumDiscountPercent, setPremiumDiscountPercent] = useState(0)
   const [wheelOrangeCard, setWheelOrangeCard] = useState(false)
   const [wheelSpunAndWon, setWheelSpunAndWon] = useState(false)
-  const [showWheelTab, setShowWheelTab] = useState(false)
   const chatRef = useRef(null)
   const appFrameRef = useRef(null)
   const wheelWonRef = useRef(false)
-  const wheelPromptTimerRef = useRef(null)
-
-  const scheduleWheelPrompt = useCallback((delayMs) => {
-    clearTimeout(wheelPromptTimerRef.current)
-    if (wheelWonRef.current) return
-    wheelPromptTimerRef.current = setTimeout(() => {
-      if (!wheelWonRef.current) setWheelOpen(true)
-    }, delayMs)
-  }, [])
-
-  useEffect(() => {
-    scheduleWheelPrompt(5000)
-    return () => clearTimeout(wheelPromptTimerRef.current)
-  }, [scheduleWheelPrompt])
+  const skipAutoScrollRef = useRef(false)
+  const [wheelWinAtStage, setWheelWinAtStage] = useState(null)
 
   const handleWheelClose = useCallback(() => {
     setWheelOpen(false)
-    if (!wheelWonRef.current) {
-      setShowWheelTab(true)
-      scheduleWheelPrompt(60_000)
-    }
-  }, [scheduleWheelPrompt])
+  }, [])
 
   const handleWheelReopen = useCallback(() => {
-    clearTimeout(wheelPromptTimerRef.current)
     setWheelOpen(true)
   }, [])
 
@@ -128,47 +119,6 @@ export default function ChatExperience({ embedHost = false }) {
     })
   }, [])
 
-  const handleWheelPrize = useCallback(
-    (prize) => {
-      let nextOrangeCard = wheelOrangeCard
-      let nextDiscount = premiumDiscountPercent
-
-      if (prize.type === 'discount') {
-        nextDiscount = prize.percent
-        setPremiumDiscountPercent(prize.percent)
-        wheelWonRef.current = true
-        setWheelSpunAndWon(true)
-        setShowWheelTab(false)
-        clearTimeout(wheelPromptTimerRef.current)
-        setWheelOpen(false)
-      } else if (prize.type === 'orange-card') {
-        nextOrangeCard = true
-        setWheelOrangeCard(true)
-        const withOrange = (prev) => (prev.includes('orange-card') ? prev : [...prev, 'orange-card'])
-        setSelectedAddons(withOrange)
-        setUiSelectedAddons(withOrange)
-        wheelWonRef.current = true
-        setWheelSpunAndWon(true)
-        setShowWheelTab(false)
-        clearTimeout(wheelPromptTimerRef.current)
-        setWheelOpen(false)
-      }
-
-      if (prize.type === 'discount' || prize.type === 'orange-card') {
-        setMessages(
-          syncJourneyMessages({
-            stage,
-            selectedPlan,
-            wheelOrangeCard: nextOrangeCard,
-            premiumDiscountPercent: nextDiscount,
-          }),
-        )
-        requestAnimationFrame(() => scrollToLatest())
-      }
-    },
-    [stage, selectedPlan, wheelOrangeCard, premiumDiscountPercent, scrollToLatest],
-  )
-
   const scrollToStep = useCallback((target) => {
     requestAnimationFrame(() => {
       const el = chatRef.current?.querySelector(`[data-journey="${target}"]`)
@@ -180,7 +130,86 @@ export default function ChatExperience({ embedHost = false }) {
     })
   }, [scrollToLatest])
 
+  const scrollToWheelResume = useCallback(
+    (stage) => {
+      const target = journeyTargetForStage(stage)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const resume = chatRef.current?.querySelector(`[data-wheel-resume="${target}"]`)
+          if (resume) {
+            resume.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+          }
+          scrollToStep(target)
+        })
+      })
+    },
+    [scrollToStep],
+  )
+
+  const handleWheelPrize = useCallback(
+    (prize) => {
+      let nextOrangeCard = wheelOrangeCard
+      let nextDiscount = premiumDiscountPercent
+
+      if (prize.type === 'discount') {
+        nextDiscount = prize.percent
+        setPremiumDiscountPercent(prize.percent)
+        wheelWonRef.current = true
+        setWheelSpunAndWon(true)
+        setWheelOpen(false)
+      } else if (prize.type === 'orange-card') {
+        nextOrangeCard = true
+        setWheelOrangeCard(true)
+        const withOrange = (prev) => (prev.includes('orange-card') ? prev : [...prev, 'orange-card'])
+        setSelectedAddons(withOrange)
+        setUiSelectedAddons(withOrange)
+        wheelWonRef.current = true
+        setWheelSpunAndWon(true)
+        setWheelOpen(false)
+      }
+
+      if (prize.type === 'discount' || prize.type === 'orange-card') {
+        if (flowMode === 'chat') {
+          if (prize.type === 'orange-card') {
+            setWheelWinAtStage(stage)
+          }
+          skipAutoScrollRef.current = true
+          setMessages(
+            syncJourneyMessages({
+              stage,
+              selectedPlan,
+              wheelOrangeCard: nextOrangeCard,
+              premiumDiscountPercent: nextDiscount,
+            }),
+          )
+        } else {
+          setMessages(
+            syncJourneyMessages({
+              stage,
+              selectedPlan,
+              wheelOrangeCard: nextOrangeCard,
+              premiumDiscountPercent: nextDiscount,
+            }),
+          )
+        }
+      }
+    },
+    [stage, selectedPlan, wheelOrangeCard, premiumDiscountPercent, flowMode],
+  )
+
   useEffect(() => {
+    if (!wheelWinAtStage || flowMode !== 'chat') return
+    skipAutoScrollRef.current = true
+    const resumeStage = wheelWinAtStage === 'welcome' ? 'plan' : wheelWinAtStage
+    scrollToWheelResume(resumeStage)
+  }, [wheelWinAtStage, flowMode, scrollToWheelResume])
+
+  useEffect(() => {
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false
+      return
+    }
     scrollToLatest()
   }, [stage, messages, userActions, faqMessages, supportVisible, redoFlow, resumeFlow, scrollToLatest])
 
@@ -483,13 +512,18 @@ export default function ChatExperience({ embedHost = false }) {
     setResumeFlow(null)
   }
 
-  const handleFlowModeChange = useCallback((mode) => {
-    setFlowMode(mode)
-    if (mode === 'chat' && !redoFlow) {
-      setJourneyEngaged(false)
-      requestAnimationFrame(() => scrollToLatest())
-    }
-  }, [redoFlow, scrollToLatest])
+  const handleFlowModeChange = useCallback(
+    (mode) => {
+      if (presentationMode) return
+      setFlowOverride(null)
+      setFlowModeState(mode)
+      if (mode === 'chat' && !redoFlow) {
+        setJourneyEngaged(false)
+        requestAnimationFrame(() => scrollToLatest())
+      }
+    },
+    [presentationMode, redoFlow, scrollToLatest],
+  )
 
   const handleUiSelectPlan = (planId) => {
     setUiSelectedPlan(planId)
@@ -538,7 +572,7 @@ export default function ChatExperience({ embedHost = false }) {
   const handleSupport = async () => {
     if (supportLoading) return
     if (flowMode === 'ui') {
-      setFlowMode('chat')
+      if (!presentationMode) setFlowModeState('chat')
     } else if (!redoFlow) {
       setJourneyEngaged(false)
     }
@@ -552,59 +586,72 @@ export default function ChatExperience({ embedHost = false }) {
     scrollToLatest()
   }
 
+  const handleUiSupportBack = () => {
+    if (supportLoading) return
+    setSupportVisible(false)
+    setSupportLoading(false)
+    setFaqTyping(false)
+    setFaqTypingAnchor((anchor) => (anchor === 'support' ? null : anchor))
+    setFaqMessages((prev) => prev.filter((m) => m.afterStep !== 'support'))
+  }
+
   const handleFaqSend = async (query) => {
     if (flowMode === 'chat' && !redoFlow) setJourneyEngaged(false)
     const anchor =
-      supportVisible || supportLoading ? 'support' : stageToAnchor(stage)
+      flowMode === 'ui' || supportVisible || supportLoading
+        ? 'support'
+        : stageToAnchor(stage)
     const id = Date.now()
     const history = faqMessages
     const revision = detectRevisionIntent(query)
 
     setFaqMessages((prev) => [...prev, { id, role: 'user', text: query, afterStep: anchor }])
 
-    const resolution = resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan })
+    if (flowMode === 'chat') {
+      const resolution = resolveRevisionIntent(revision, { stage, redoFlow, selectedPlan })
 
-    if (resolution.action === 'already') {
-      setFaqMessages((prev) => [
-        ...prev,
-        {
-          id: id + 1,
-          role: 'ai',
-          text: resolution.message || getAlreadyOnStepReply(resolution.step),
-          afterStep: anchor,
-        },
-      ])
-      scrollToLatest()
-      return
-    }
+      if (resolution.action === 'already') {
+        setFaqMessages((prev) => [
+          ...prev,
+          {
+            id: id + 1,
+            role: 'ai',
+            text: resolution.message || getAlreadyOnStepReply(resolution.step),
+            afterStep: anchor,
+          },
+        ])
+        scrollToLatest()
+        return
+      }
 
-    if (resolution.action === 'needs' || resolution.action === 'blocked') {
-      setFaqMessages((prev) => [
-        ...prev,
-        { id: id + 1, role: 'ai', text: resolution.message, afterStep: anchor },
-      ])
-      return
-    }
-
-    if (resolution.action === 'redo') {
-      startRedo(resolution.type)
-      if (resolution.message) {
+      if (resolution.action === 'needs' || resolution.action === 'blocked') {
         setFaqMessages((prev) => [
           ...prev,
           { id: id + 1, role: 'ai', text: resolution.message, afterStep: anchor },
         ])
+        return
       }
-      markJourneyEngaged()
-      scrollToLatest()
-      return
+
+      if (resolution.action === 'redo') {
+        startRedo(resolution.type)
+        if (resolution.message) {
+          setFaqMessages((prev) => [
+            ...prev,
+            { id: id + 1, role: 'ai', text: resolution.message, afterStep: anchor },
+          ])
+        }
+        markJourneyEngaged()
+        scrollToLatest()
+        return
+      }
     }
 
     const context = buildChatContext({
-      stage,
-      selectedPlan,
-      selectedAddons,
-      vehicleValue,
-      policyStart,
+      stage: flowMode === 'ui' ? uiStage : stage,
+      selectedPlan: flowMode === 'ui' ? uiSelectedPlan : selectedPlan,
+      selectedAddons: flowMode === 'ui' ? uiSelectedAddons : selectedAddons,
+      vehicleValue: flowMode === 'ui' ? uiVehicleValue : vehicleValue,
+      policyStart: flowMode === 'ui' ? uiPolicyStart : policyStart,
     })
 
     if (isControversialQuery(query)) {
@@ -633,6 +680,16 @@ export default function ChatExperience({ embedHost = false }) {
   }
 
   const hasSupportThread = faqMessages.some((m) => m.afterStep === 'support')
+  const uiSupportActive =
+    flowMode === 'ui' && (supportLoading || supportVisible || hasSupportThread)
+  const supportPlanHint =
+    flowMode === 'ui'
+      ? uiSelectedPlan
+        ? getPlanById(uiSelectedPlan, uiVehicleValue)?.name
+        : undefined
+      : selectedPlan
+        ? getPlanById(selectedPlan, vehicleValue)?.name
+        : undefined
 
   const proceedCta = getProceedCta({ stage, redoFlow })
   const hasChatted = faqMessages.some((m) => m.role === 'user')
@@ -657,10 +714,60 @@ export default function ChatExperience({ embedHost = false }) {
   const highlightConfirm = (stage === 'confirm' && !redoFlow) || redoFlow?.step === 'confirm'
   const highlightDocs = stage === 'documents' && !redoFlow && !docsLocked
 
+  const wheelArchivePlan = wheelArchivesStep(wheelWinAtStage, 'plan')
+  const wheelArchiveAddons = wheelArchivesStep(wheelWinAtStage, 'addons')
+  const wheelArchiveConfirm = wheelArchivesStep(wheelWinAtStage, 'confirm')
+  const wheelArchiveDocs = wheelArchivesStep(wheelWinAtStage, 'documents')
+
   const handleProceed = () => {
     if (!proceedCta) return
     presentPendingStep()
   }
+
+  const journeyPastPayment =
+    flowMode === 'ui'
+      ? uiStage === 'documents' || uiStage === 'complete'
+      : stage === 'documents' || stage === 'complete'
+
+  const showWheelCap =
+    !wheelSpunAndWon && !wheelOpen && !journeyPastPayment && !videoCallActive
+
+  const supportFaqSection = (
+    <div className="space-y-3" data-scroll-anchor>
+      {supportLoading && (
+        <ChatBubble role="ai">
+          <TypingDots />
+        </ChatBubble>
+      )}
+      <AnimatePresence>
+        {supportVisible && (
+          <motion.div
+            key="support-callback"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className={uiSupportActive ? undefined : 'ml-9'}
+          >
+            <SupportCallbackCard
+              key={supportRequestKey}
+              onClose={() => setSupportVisible(false)}
+              onTeamsCallNow={() => {
+                setSupportVisible(false)
+                setVideoCallActive(true)
+              }}
+              planHint={supportPlanHint}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <FaqThread
+        messages={faqMessages}
+        anchor="support"
+        typing={faqTyping}
+        activeAnchor={faqTypingAnchor}
+      />
+    </div>
+  )
 
   return (
       <div
@@ -668,20 +775,28 @@ export default function ChatExperience({ embedHost = false }) {
         className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
       >
         <JackpotWheelModal open={wheelOpen} onClose={handleWheelClose} onPrize={handleWheelPrize} />
+        {videoCallActive && (
+          <SupportAuraCall
+            onEndCall={() => {
+              setVideoCallActive(false)
+              setSupportVisible(false)
+            }}
+          />
+        )}
         <WheelCornerTab
-          visible={!wheelSpunAndWon && !wheelOpen && showWheelTab}
+          visible={showWheelCap}
           onOpen={handleWheelReopen}
           containerRef={appFrameRef}
         />
         <div className="relative z-10 flex min-h-0 flex-1 flex-col pb-2">
       <Header
         flowMode={flowMode}
-        onFlowModeChange={handleFlowModeChange}
+        onFlowModeChange={showFlowToggle ? handleFlowModeChange : undefined}
         onContactSupport={handleSupport}
         supportLoading={supportLoading}
       />
 
-      {flowMode === 'ui' ? (
+      {flowMode === 'ui' && !uiSupportActive && (
         <UiRenewalFlow
           stage={uiStage}
           vehicleValue={uiVehicleValue}
@@ -700,10 +815,30 @@ export default function ChatExperience({ embedHost = false }) {
           wheelOrangeCard={wheelOrangeCard}
           premiumDiscountPercent={premiumDiscountPercent}
         />
-      ) : (
+      )}
+
+      {flowMode === 'ui' && uiSupportActive && (
+        <main
+          ref={chatRef}
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-2"
+        >
+          <button
+            type="button"
+            onClick={handleUiSupportBack}
+            disabled={supportLoading}
+            className="mb-3 inline-flex items-center gap-0.5 rounded-full py-1 pr-2 text-xs font-semibold text-gray-600 transition-colors hover:text-liva-orange disabled:opacity-50"
+          >
+            <ChevronLeft className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+            Go back
+          </button>
+          <div className="relative z-10 pb-6">{supportFaqSection}</div>
+        </main>
+      )}
+
+      {flowMode === 'chat' && (
       <main ref={chatRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-8 pt-1">
         <div className="relative z-10 space-y-3 pb-6">
-        <LockedSection locked={journeyLocked}>
+        <LockedSection locked={journeyLocked || wheelArchivePlan}>
           <ChatBubble role="ai" delay={0}>
             {typing ? (
               <TypingDots />
@@ -722,9 +857,28 @@ export default function ChatExperience({ embedHost = false }) {
 
         <AnimatePresence>
           {messages.includes('plan') && resumeFlow?.step !== 'plan' && (
-            <motion.div key="plan" data-journey="plan" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-              <LockedSection locked={planLocked}>
+            <motion.div
+              key="plan"
+              {...(wheelArchivePlan ? {} : { 'data-journey': 'plan' })}
+              data-scroll-anchor
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
+              <LockedSection locked={planLocked || wheelArchivePlan}>
                 <div>
+                  <PlanSelector
+                    selectedPlan={frozenPlan}
+                    onSelect={handlePlanSelect}
+                    disabled={planLocked || wheelArchivePlan}
+                    highlightNext={highlightPlan && !planLocked && !wheelArchivePlan}
+                    vehicleValue={vehicleValue}
+                  />
+                </div>
+              </LockedSection>
+              {wheelArchivePlan && (
+                <div data-wheel-resume="plan" data-journey="plan" data-scroll-anchor className="space-y-2">
+                  <WheelWinNotice show />
                   <PlanSelector
                     selectedPlan={frozenPlan}
                     onSelect={handlePlanSelect}
@@ -733,7 +887,7 @@ export default function ChatExperience({ embedHost = false }) {
                     vehicleValue={vehicleValue}
                   />
                 </div>
-              </LockedSection>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -746,14 +900,21 @@ export default function ChatExperience({ embedHost = false }) {
         />
 
         <AnimatePresence>
-          {(messages.includes('addons') || wheelOrangeCard) &&
+          {messages.includes('addons') &&
             (wheelOrangeCard || (frozenPlan && isComprehensivePlan(frozenPlan))) &&
             resumeFlow?.step !== 'addons' && (
-            <motion.div key="addons" data-journey="addons" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-              <LockedSection locked={journeyLocked}>
+            <motion.div
+              key="addons"
+              {...(wheelArchiveAddons ? {} : { 'data-journey': 'addons' })}
+              data-scroll-anchor
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
+              <LockedSection locked={journeyLocked || wheelArchiveAddons}>
                 <UserAction delay={0}>{userActions[0]}</UserAction>
               </LockedSection>
-              <LockedSection locked={addonsLocked}>
+              <LockedSection locked={addonsLocked || wheelArchiveAddons}>
                 <ChatBubble role="ai">
                   <AddonsIntroMessage />
                 </ChatBubble>
@@ -762,13 +923,36 @@ export default function ChatExperience({ embedHost = false }) {
                     planId={frozenPlan}
                     selectedAddons={frozenAddons}
                     onToggle={toggleAddon}
-                    disabled={addonsLocked}
-                    onContinue={stage === 'addons' && !redoFlow ? handleConfirmAddons : undefined}
-                    highlightNext={highlightAddons && !addonsLocked}
+                    disabled={addonsLocked || wheelArchiveAddons}
+                    onContinue={
+                      stage === 'addons' && !redoFlow && !wheelArchiveAddons
+                        ? handleConfirmAddons
+                        : undefined
+                    }
+                    highlightNext={highlightAddons && !addonsLocked && !wheelArchiveAddons}
                     {...addonGridProps}
                   />
                 </div>
               </LockedSection>
+              {wheelArchiveAddons && (
+                <div data-wheel-resume="addons" data-journey="addons" data-scroll-anchor className="space-y-2">
+                  <WheelWinNotice show />
+                  <ChatBubble role="ai">
+                    <AddonsIntroMessage />
+                  </ChatBubble>
+                  <div className="ml-9">
+                    <AddonGrid
+                      planId={frozenPlan}
+                      selectedAddons={frozenAddons}
+                      onToggle={toggleAddon}
+                      disabled={addonsLocked}
+                      onContinue={stage === 'addons' && !redoFlow ? handleConfirmAddons : undefined}
+                      highlightNext={highlightAddons && !addonsLocked}
+                      {...addonGridProps}
+                    />
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -784,8 +968,15 @@ export default function ChatExperience({ embedHost = false }) {
           {(messages.includes('confirm') || premiumDiscountPercent > 0) &&
             selectedPlan &&
             resumeFlow?.step !== 'confirm' && (
-            <motion.div key="confirm" data-journey="confirm" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-              <LockedSection locked={confirmLocked}>
+            <motion.div
+              key="confirm"
+              {...(wheelArchiveConfirm ? {} : { 'data-journey': 'confirm' })}
+              data-scroll-anchor
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
+              <LockedSection locked={confirmLocked || wheelArchiveConfirm}>
                 <UserAction delay={0}>{userActions[1] ?? userActions[0]}</UserAction>
                 <ChatBubble role="ai">
                   <ConfirmIntroMessage />
@@ -802,11 +993,35 @@ export default function ChatExperience({ embedHost = false }) {
                     onDownloadQuote={handleDownloadQuote}
                     onProceed={handlePay}
                     processing={processing && stage === 'confirm' && !redoFlow}
-                    highlightNext={highlightConfirm && !confirmLocked}
+                    highlightNext={highlightConfirm && !confirmLocked && !wheelArchiveConfirm}
                     {...confirmWheelProps}
                   />
                 </div>
               </LockedSection>
+              {wheelArchiveConfirm && (
+                <div data-wheel-resume="confirm" data-journey="confirm" data-scroll-anchor className="space-y-2">
+                  <WheelWinNotice show />
+                  <ChatBubble role="ai">
+                    <ConfirmIntroMessage />
+                  </ChatBubble>
+                  <div className="ml-9">
+                    <ConfirmDetailsCard
+                      planId={selectedPlan}
+                      selectedAddons={selectedAddons}
+                      vehicleValue={vehicleValue}
+                      policyStart={policyStart}
+                      onPolicyStartChange={setPolicyStart}
+                      detailsExpanded={detailsExpanded}
+                      onToggleDetails={() => setDetailsExpanded((open) => !open)}
+                      onDownloadQuote={handleDownloadQuote}
+                      onProceed={handlePay}
+                      processing={processing && stage === 'confirm' && !redoFlow}
+                      highlightNext={highlightConfirm && !confirmLocked}
+                      {...confirmWheelProps}
+                    />
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -820,20 +1035,44 @@ export default function ChatExperience({ embedHost = false }) {
 
         <AnimatePresence>
           {messages.includes('docs') && resumeFlow?.step !== 'docs' && (
-            <motion.div key="docs" data-journey="docs" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+            <motion.div
+              key="docs"
+              {...(wheelArchiveDocs ? {} : { 'data-journey': 'docs' })}
+              data-scroll-anchor
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
               <ChatBubble role="ai">
                 <PaymentMessage />
               </ChatBubble>
               <div className="ml-9">
-                <LockedSection locked={docsLocked}>
+                <LockedSection locked={docsLocked || wheelArchiveDocs}>
+                  <DocumentUpload
+                    uploaded={stage === 'complete'}
+                    uploading={processing && stage === 'documents'}
+                    onVerify={
+                      stage === 'documents' && !docsLocked && !wheelArchiveDocs
+                        ? handleVerify
+                        : undefined
+                    }
+                    highlightNext={highlightDocs && !wheelArchiveDocs}
+                  />
+                </LockedSection>
+              </div>
+              {wheelArchiveDocs && (
+                <div data-wheel-resume="docs" data-journey="docs" data-scroll-anchor className="space-y-2">
+                  <WheelWinNotice show />
+                  <div className="ml-9">
                   <DocumentUpload
                     uploaded={stage === 'complete'}
                     uploading={processing && stage === 'documents'}
                     onVerify={stage === 'documents' && !docsLocked ? handleVerify : undefined}
                     highlightNext={highlightDocs}
                   />
-                </LockedSection>
-              </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1029,49 +1268,17 @@ export default function ChatExperience({ embedHost = false }) {
           )}
         </AnimatePresence>
 
-        {(supportLoading || supportVisible || hasSupportThread) && (
-          <div className="space-y-3" data-scroll-anchor>
-            {supportLoading && (
-              <ChatBubble role="ai">
-                <TypingDots />
-              </ChatBubble>
-            )}
-            <AnimatePresence>
-              {supportVisible && (
-                <motion.div
-                  key="support-callback"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="ml-9"
-                >
-                  <SupportCallbackCard
-                    key={supportRequestKey}
-                    onClose={() => setSupportVisible(false)}
-                    planHint={
-                      selectedPlan ? getPlanById(selectedPlan, vehicleValue)?.name : undefined
-                    }
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <FaqThread
-              messages={faqMessages}
-              anchor="support"
-              typing={faqTyping}
-              activeAnchor={faqTypingAnchor}
-            />
-          </div>
-        )}
+        {(supportLoading || supportVisible || hasSupportThread) && supportFaqSection}
 
         </div>
       </main>
       )}
 
-      {flowMode === 'chat' && (
+      {(flowMode === 'chat' || uiSupportActive) && (
       <div className="shrink-0 px-3 pb-2 pt-1 flex flex-col items-center gap-1.5">
-        <PoweredByInster />
+        {flowMode === 'chat' && <PoweredByInster />}
 
+        {flowMode === 'chat' && (
         <AnimatePresence>
           {showProceedBadge && (
             <motion.div
@@ -1097,6 +1304,7 @@ export default function ChatExperience({ embedHost = false }) {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
 
         <div className="w-full">
           <ChatInput
@@ -1128,6 +1336,30 @@ function stageToAnchor(stage) {
   if (stage === 'documents') return 'docs'
   if (stage === 'complete') return 'policy'
   return 'intro'
+}
+
+function journeyTargetForStage(stage) {
+  if (stage === 'welcome' || stage === 'plan') return 'plan'
+  if (stage === 'addons') return 'addons'
+  if (stage === 'confirm') return 'confirm'
+  if (stage === 'documents') return 'docs'
+  if (stage === 'complete') return 'policy'
+  return 'plan'
+}
+
+function wheelArchivesStep(wheelWinAtStage, step) {
+  if (!wheelWinAtStage) return false
+  if (step === 'plan') return wheelWinAtStage === 'plan' || wheelWinAtStage === 'welcome'
+  return wheelWinAtStage === step
+}
+
+function WheelWinNotice({ show }) {
+  if (!show) return null
+  return (
+    <ChatBubble role="ai" delay={0.12}>
+      <FormattedMessage text={COPY.wheel.orangeCardWon} />
+    </ChatBubble>
+  )
 }
 
 function FaqThread({ messages, anchor, typing, activeAnchor }) {

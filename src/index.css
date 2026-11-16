@@ -37,6 +37,34 @@
 }
 
 @layer components {
+  .demo-lane-title {
+    font-family: Outfit, system-ui, sans-serif;
+    margin-top: 0;
+    padding-top: 0;
+    font-size: 1.0625rem;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1.25;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.94);
+  }
+
+  .demo-lane-title::before {
+    content: '';
+    display: block;
+    width: 1.75rem;
+    height: 2px;
+    margin: 0 auto 0.625rem;
+    border-radius: 999px;
+    background: rgba(240, 90, 40, 0.85);
+  }
+
+  @media (min-width: 640px) {
+    .demo-lane-title {
+      font-size: 1.125rem;
+    }
+  }
+
   .texture-card {
     background-color: #ffffff;
     background-image:

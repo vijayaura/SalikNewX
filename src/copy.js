@@ -23,6 +23,10 @@ export const COPY = {
     proceedToPayment: 'Proceed to Payment',
     reviewDetails: 'Review your details',
   },
+  wheel: {
+    orangeCardWon:
+      "Congratulations — you've won the **LIVA Orange Card** add-on from the spin wheel! It's on your quote now. Continue from the step below when you're ready.",
+  },
   cards: {
     confirmTitle: 'Your Insurance Summary',
     carModel: 'Your Car Model',

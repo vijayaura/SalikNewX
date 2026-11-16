@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Sparkles, Volume2, VolumeX, X } from 'lucide-react'
 
@@ -11,11 +11,16 @@ const SEGMENTS = [
   { id: 'd8', label: '8% off', color: '#fdba74', text: '#7c2d12', type: 'discount', percent: 8 },
 ]
 
+const ORANGE_INDEX = SEGMENTS.findIndex((s) => s.type === 'orange-card')
+const ORANGE_PRIZE = SEGMENTS[ORANGE_INDEX]
+
 const WHEEL_SIZE = 220
 const WHEEL_CX = WHEEL_SIZE / 2
 const WHEEL_CY = WHEEL_SIZE / 2
 const WHEEL_R = 102
 const LABEL_R = 62
+const SLICE = 360 / SEGMENTS.length
+const STOP_DURATION_MS = 3200
 
 function wedgePath(cx, cy, r, startDeg, endDeg) {
   const rad = (deg) => (deg * Math.PI) / 180
@@ -30,6 +35,11 @@ function wedgePath(cx, cy, r, startDeg, endDeg) {
 function labelAt(cx, cy, r, midDeg) {
   const rad = (midDeg * Math.PI) / 180
   return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) }
+}
+
+/** Rotation (deg) that aligns segment `index` center with the top pointer. */
+function rotationForSegment(index) {
+  return 360 - index * SLICE - SLICE / 2
 }
 
 function playToneSequence(frequencies, soundOn) {
@@ -74,13 +84,14 @@ function playSpinTick(soundOn) {
 }
 
 export default function JackpotWheelModal({ open, onClose, onPrize }) {
-  const [spinning, setSpinning] = useState(false)
+  const [phase, setPhase] = useState('idle')
   const [rotation, setRotation] = useState(0)
   const [resultLabel, setResultLabel] = useState(null)
   const [soundOn, setSoundOn] = useState(true)
   const tickRef = useRef(null)
-
-  const slice = 360 / SEGMENTS.length
+  const spinLoopRef = useRef(null)
+  const stopTimerRef = useRef(null)
+  const rotationRef = useRef(0)
 
   const clearTick = useCallback(() => {
     if (tickRef.current) {
@@ -89,36 +100,99 @@ export default function JackpotWheelModal({ open, onClose, onPrize }) {
     }
   }, [])
 
-  const handleSpin = () => {
-    if (spinning) return
+  const clearSpinLoop = useCallback(() => {
+    if (spinLoopRef.current) {
+      clearInterval(spinLoopRef.current)
+      spinLoopRef.current = null
+    }
+  }, [])
+
+  const resetWheel = useCallback(() => {
+    clearTick()
+    clearSpinLoop()
+    if (stopTimerRef.current) {
+      window.clearTimeout(stopTimerRef.current)
+      stopTimerRef.current = null
+    }
+    setPhase('idle')
+    setRotation(0)
+    rotationRef.current = 0
     setResultLabel(null)
-    setSpinning(true)
+  }, [clearTick, clearSpinLoop])
 
-    const index = Math.floor(Math.random() * SEGMENTS.length)
-    const prize = SEGMENTS[index]
-    const spins = 5 + Math.floor(Math.random() * 2)
-    const offset = 360 - index * slice - slice / 2
-    const delta = spins * 360 + offset
+  useEffect(() => {
+    if (!open) resetWheel()
+  }, [open, resetWheel])
 
-    tickRef.current = setInterval(() => playSpinTick(soundOn), 120)
-
-    setRotation((prev) => prev + delta)
-
-    window.setTimeout(() => {
+  useEffect(
+    () => () => {
       clearTick()
-      setSpinning(false)
-      setResultLabel(prize.label)
-      if (prize.type === 'discount') {
-        playToneSequence([523.25, 659.25, 783.99], soundOn)
-        onPrize?.({ type: 'discount', percent: prize.percent, label: prize.label })
-      } else if (prize.type === 'orange-card') {
-        playToneSequence([392, 523.25, 659.25, 783.99], soundOn)
-        onPrize?.({ type: 'orange-card', label: prize.label })
-      } else {
-        playToneSequence([440, 493.88], soundOn)
-      }
-    }, 4200)
+      clearSpinLoop()
+      if (stopTimerRef.current) window.clearTimeout(stopTimerRef.current)
+    },
+    [clearTick, clearSpinLoop],
+  )
+
+  const handleStartSpin = () => {
+    if (phase !== 'idle') return
+    setResultLabel(null)
+    setPhase('spinning')
+    tickRef.current = setInterval(() => playSpinTick(soundOn), 120)
+    spinLoopRef.current = setInterval(() => {
+      rotationRef.current += 22
+      setRotation(rotationRef.current)
+    }, 48)
   }
+
+  const handleStopSpin = () => {
+    if (phase !== 'spinning') return
+    clearSpinLoop()
+    clearTick()
+    setPhase('stopping')
+
+    const targetAtZero = rotationForSegment(ORANGE_INDEX)
+    const current = rotationRef.current
+    const currentMod = ((current % 360) + 360) % 360
+    let align = (targetAtZero - currentMod + 360) % 360
+    if (align < 60) align += 360
+    const extraSpins = 2 * 360
+    const next = current + extraSpins + align
+    rotationRef.current = next
+    setRotation(next)
+
+    stopTimerRef.current = window.setTimeout(() => {
+      setPhase('done')
+      setResultLabel(ORANGE_PRIZE.label)
+      playToneSequence([392, 523.25, 659.25, 783.99], soundOn)
+      onPrize?.({ type: 'orange-card', label: ORANGE_PRIZE.label })
+    }, STOP_DURATION_MS)
+  }
+
+  const primaryAction = () => {
+    if (phase === 'idle') handleStartSpin()
+    else if (phase === 'spinning') handleStopSpin()
+  }
+
+  const statusLine =
+    phase === 'spinning'
+      ? "Tap Stop when you're ready"
+      : phase === 'stopping'
+        ? 'Slowing down…'
+        : resultLabel
+          ? `You won: ${resultLabel}`
+          : 'Press Spin, then stop when you like'
+
+  const buttonLabel =
+    phase === 'spinning' ? 'Stop' : phase === 'stopping' ? 'Stopping…' : 'Spin the wheel'
+
+  const buttonDisabled = phase === 'stopping' || phase === 'done'
+
+  const wheelTransition =
+    phase === 'spinning'
+      ? { duration: 0.06, ease: 'linear' }
+      : phase === 'stopping'
+        ? { duration: STOP_DURATION_MS / 1000, ease: [0.12, 0.8, 0.15, 1] }
+        : { duration: 0 }
 
   if (!open) return null
 
@@ -166,7 +240,7 @@ export default function JackpotWheelModal({ open, onClose, onPrize }) {
           <h2 id="wheel-title" className="mt-0.5 text-center text-lg font-bold text-gray-900">
             Spin for a surprise
           </h2>
-          <p className="mb-4 text-center text-[11px] text-gray-500">Your quote could get even better.</p>
+          <p className="mb-4 text-center text-[11px] text-gray-500">Stop the wheel yourself — good things await.</p>
 
           <div className="relative mx-auto mb-3 h-[200px] w-[200px] max-w-full">
             <div
@@ -179,7 +253,7 @@ export default function JackpotWheelModal({ open, onClose, onPrize }) {
             <motion.div
               className="relative h-full w-full overflow-hidden rounded-full border-[5px] border-white shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
               animate={{ rotate: rotation }}
-              transition={{ duration: 4.2, ease: [0.12, 0.8, 0.15, 1] }}
+              transition={wheelTransition}
             >
               <svg
                 width={WHEEL_SIZE}
@@ -189,9 +263,9 @@ export default function JackpotWheelModal({ open, onClose, onPrize }) {
                 aria-hidden
               >
                 {SEGMENTS.map((seg, i) => {
-                  const start = i * slice
-                  const end = (i + 1) * slice
-                  const mid = start + slice / 2
+                  const start = i * SLICE
+                  const end = (i + 1) * SLICE
+                  const mid = start + SLICE / 2
                   const { x, y } = labelAt(WHEEL_CX, WHEEL_CY, LABEL_R, mid)
                   const fontSize = seg.label.length > 9 ? 7 : 8
                   const labelRotation = mid > 90 && mid < 270 ? mid + 180 : mid
@@ -233,17 +307,15 @@ export default function JackpotWheelModal({ open, onClose, onPrize }) {
             </div>
           </div>
 
-          <p className="mb-3 min-h-[16px] text-center text-[11px] font-medium text-gray-500">
-            {spinning ? 'Spinning…' : resultLabel ? `You won: ${resultLabel}` : 'Good luck!'}
-          </p>
+          <p className="mb-3 min-h-[16px] text-center text-[11px] font-medium text-gray-500">{statusLine}</p>
 
           <button
             type="button"
-            disabled={spinning}
-            onClick={handleSpin}
+            disabled={buttonDisabled}
+            onClick={primaryAction}
             className="w-full rounded-xl bg-liva-orange py-3 text-sm font-semibold text-white shadow-btn-primary transition-colors hover:bg-liva-orange-light disabled:opacity-60"
           >
-            {spinning ? 'Spinning…' : resultLabel ? 'Spin again' : 'Spin the wheel'}
+            {buttonLabel}
           </button>
         </motion.div>
       </motion.div>

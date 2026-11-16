@@ -12,13 +12,12 @@ export function syncJourneyMessages({
   }
 
   const msgs = ['greeting', 'vehicle', 'plan']
-  if (!selectedPlan && !wheelOrangeCard) return msgs
+  if (!selectedPlan) return msgs
 
   const showAddons =
-    wheelOrangeCard ||
-    (selectedPlan &&
-      isComprehensivePlan(selectedPlan) &&
-      (stage === 'addons' || stage === 'confirm' || stage === 'documents' || stage === 'complete'))
+    selectedPlan &&
+    isComprehensivePlan(selectedPlan) &&
+    (stage === 'addons' || stage === 'confirm' || stage === 'documents' || stage === 'complete')
 
   if (showAddons) msgs.push('addons')
   if (
