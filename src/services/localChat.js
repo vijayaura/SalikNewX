@@ -1,5 +1,6 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
 import { GENERAL_KNOWLEDGE } from '../data/generalKnowledge'
+import { getOffTopicRedirect, isOffTopicQuery } from './contentGuard'
 
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -143,13 +144,13 @@ function contextReply(query, context) {
   return null
 }
 
-function unknownReply(context) {
-  return `I'm not sure about that, ${context.customerName}. I'm best with this renewal — plans, add-ons, payment, documents, and claims. Try a suggestion chip below, or call ${context.supportPhone} for anything else.`
-}
-
 export function getLocalChatReply(query, context) {
   const trimmed = query.trim()
   if (!trimmed) return FAQ_FALLBACK
+
+  if (isOffTopicQuery(trimmed)) {
+    return getOffTopicRedirect(context)
+  }
 
   const lower = trimmed.toLowerCase()
 
@@ -170,7 +171,7 @@ export function getLocalChatReply(query, context) {
   const general = findGeneralKnowledge(trimmed)
   if (general) return general.answer
 
-  return unknownReply(context)
+  return getOffTopicRedirect(context)
 }
 
 export function findFaqAnswer(query) {

@@ -1,5 +1,5 @@
 import { ADDONS, USER, VEHICLE, SUPPORT, formatAED, getPlanById } from '../data'
-import { CHAT_GUARDRAILS } from './contentGuard'
+import { CHAT_GUARDRAILS, getOffTopicRedirectInstruction } from './contentGuard'
 
 const STAGE_LABELS = {
   welcome: 'Welcome',
@@ -39,7 +39,9 @@ export function buildChatContext({
 export function buildSystemPrompt(context) {
   return `${CHAT_GUARDRAILS}
 
-You are Aura, LIVA Insurance's in-app advisor in the UAE (embedded in Salik's renewal experience). Help ${context.customerName} renew motor insurance like a focused call-centre agent — journey first, concise, and on-brand.
+You are Aura, LIVA Insurance's renewal advisor in the UAE. Help ${context.customerName} complete motor insurance renewal — journey first, concise, and on-brand.
+
+${getOffTopicRedirectInstruction(context)}
 
 Current renewal context:
 - Vehicle: ${context.vehicle} (${context.plate})

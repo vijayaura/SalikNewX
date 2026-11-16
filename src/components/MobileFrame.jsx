@@ -1,6 +1,7 @@
 import PhoneShell from './PhoneShell'
 import ChatExperience from '../ChatExperience'
 import FigmaPrototypeEmbed from './FigmaPrototypeEmbed'
+import JourneyEntryGate from './JourneyEntryGate'
 
 const DEMO_LANES = [
   { title: 'Existing Journey', kind: 'figma' },
@@ -25,11 +26,13 @@ export default function MobileFrame() {
             >
               <h2 className="demo-lane-title w-full shrink-0 px-2">{lane.title}</h2>
               <PhoneShell compact fillRemaining className="w-full">
-                {lane.kind === 'figma' ? (
-                  <FigmaPrototypeEmbed title={lane.title} />
-                ) : (
-                  <ChatExperience presentationMode={lane.kind} />
-                )}
+                <JourneyEntryGate>
+                  {lane.kind === 'figma' ? (
+                    <FigmaPrototypeEmbed title={lane.title} />
+                  ) : (
+                    <ChatExperience presentationMode={lane.kind} />
+                  )}
+                </JourneyEntryGate>
               </PhoneShell>
             </div>
           ))}

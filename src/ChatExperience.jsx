@@ -9,8 +9,10 @@ import AddonGrid from './components/AddonGrid'
 import ConfirmDetailsCard from './components/ConfirmDetailsCard'
 import DocumentUpload, { PolicyReady } from './components/DocumentUpload'
 import {
+  USER,
   VEHICLE,
   addonsAfterPlanChange,
+  calculateTotal,
   clampInsuredValue,
   formatAED,
   getPlanById,
@@ -34,7 +36,7 @@ import SupportCallbackCard from './components/SupportCallbackCard'
 import SupportAuraCall from './components/SupportAuraCall'
 import PoweredByInster from './components/PoweredByInster'
 import JackpotWheelModal from './components/JackpotWheelModal'
-import WheelCornerTab from './components/WheelCornerTab'
+import PaymentCheckoutModal from './components/PaymentCheckoutModal'
 import UiRenewalFlow from './components/UiRenewalFlow'
 import { COPY } from './copy'
 import { addMonthsToDate, getTodayDate } from './data'
@@ -89,15 +91,16 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
   const chatRef = useRef(null)
   const appFrameRef = useRef(null)
   const wheelWonRef = useRef(false)
+  const wheelAutoShownRef = useRef(false)
   const skipAutoScrollRef = useRef(false)
   const [wheelWinAtStage, setWheelWinAtStage] = useState(null)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [paymentModalBusy, setPaymentModalBusy] = useState(false)
+  const [paymentTarget, setPaymentTarget] = useState(null)
+  const paymentViaResumeRef = useRef(false)
 
   const handleWheelClose = useCallback(() => {
     setWheelOpen(false)
-  }, [])
-
-  const handleWheelReopen = useCallback(() => {
-    setWheelOpen(true)
   }, [])
 
   const markJourneyEngaged = useCallback(() => setJourneyEngaged(true), [])
@@ -293,11 +296,10 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     URL.revokeObjectURL(url)
   }
 
-  const handlePay = async () => {
-    if (stage !== 'confirm' && !redoFlow) return
+  const finalizeChatPayment = useCallback(async () => {
     markJourneyEngaged()
     setProcessing(true)
-    await delay(1800)
+    await delay(600)
     setProcessing(false)
 
     if (redoFlow) {
@@ -316,6 +318,48 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     setRedoDraft({ plan: null, addons: [] })
     setStage('documents')
     setMessages((m) => (m.includes('docs') ? m : [...m, 'docs']))
+  }, [redoFlow, redoDraft, vehicleValue])
+
+  const getChatPaymentAmount = useCallback(() => {
+    const planId = redoFlow ? redoDraft.plan : selectedPlan
+    if (!planId) return 0
+    const plan = getPlanById(planId, vehicleValue)
+    const addons = redoFlow ? redoDraft.addons : selectedAddons
+    return calculateTotal(plan?.price ?? 0, addons, planId, {
+      includeOrangeCard: wheelOrangeCard,
+      premiumDiscountPercent,
+    }).total
+  }, [
+    redoFlow,
+    redoDraft,
+    selectedPlan,
+    selectedAddons,
+    vehicleValue,
+    wheelOrangeCard,
+    premiumDiscountPercent,
+  ])
+
+  const getUiPaymentAmount = useCallback(() => {
+    if (!uiSelectedPlan) return 0
+    const plan = getPlanById(uiSelectedPlan, uiVehicleValue)
+    return calculateTotal(plan?.price ?? 0, uiSelectedAddons, uiSelectedPlan, {
+      includeOrangeCard: wheelOrangeCard,
+      premiumDiscountPercent,
+    }).total
+  }, [uiSelectedPlan, uiSelectedAddons, uiVehicleValue, wheelOrangeCard, premiumDiscountPercent])
+
+  const openChatPaymentModal = useCallback(
+    (viaResume = false) => {
+      if (stage !== 'confirm' && !redoFlow) return
+      paymentViaResumeRef.current = viaResume
+      setPaymentTarget('chat')
+      setPaymentModalOpen(true)
+    },
+    [stage, redoFlow],
+  )
+
+  const handlePay = () => {
+    openChatPaymentModal(false)
   }
 
   const startRedo = (type) => {
@@ -420,6 +464,29 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     markJourneyEngaged()
   }, [markJourneyEngaged])
 
+  const handlePaymentModalPay = useCallback(async () => {
+    setPaymentModalBusy(true)
+    await delay(1600)
+    setPaymentModalBusy(false)
+    setPaymentModalOpen(false)
+
+    if (paymentTarget === 'ui') {
+      setUiProcessing(true)
+      await delay(500)
+      setUiProcessing(false)
+      setUiStage('documents')
+    } else if (paymentTarget === 'chat') {
+      const viaResume = paymentViaResumeRef.current
+      await finalizeChatPayment()
+      paymentViaResumeRef.current = false
+      if (viaResume) {
+        presentResumeStep('docs')
+      }
+    }
+
+    setPaymentTarget(null)
+  }, [paymentTarget, finalizeChatPayment, presentResumeStep])
+
   const presentPendingStep = useCallback(() => {
     const step = getPendingStep({ stage, redoFlow })
     if (!step) return
@@ -476,30 +543,8 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     toggleAddon(id)
   }
 
-  const handleResumePay = async () => {
-    if (stage !== 'confirm' && !redoFlow) return
-    markJourneyEngaged()
-    setProcessing(true)
-    await delay(1800)
-    setProcessing(false)
-
-    if (redoFlow) {
-      const plan = getPlanById(redoDraft.plan, vehicleValue)
-      setSelectedPlan(redoDraft.plan)
-      setSelectedAddons(redoDraft.addons)
-      setUserActions((prev) => {
-        const next = [...prev]
-        if (plan) next[0] = COPY.user.plan(plan.name)
-        next[1] = COPY.user.addons(redoDraft.addons.length)
-        return next
-      })
-    }
-
-    setRedoFlow(null)
-    setRedoDraft({ plan: null, addons: [] })
-    setStage('documents')
-    setMessages((m) => (m.includes('docs') ? m : [...m, 'docs']))
-    presentResumeStep('docs')
+  const handleResumePay = () => {
+    openChatPaymentModal(true)
   }
 
   const handleResumeVerify = async () => {
@@ -554,12 +599,10 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     URL.revokeObjectURL(url)
   }
 
-  const handleUiAgreePay = async () => {
+  const handleUiAgreePay = () => {
     if (!uiSelectedPlan) return
-    setUiProcessing(true)
-    await delay(1800)
-    setUiProcessing(false)
-    setUiStage('documents')
+    setPaymentTarget('ui')
+    setPaymentModalOpen(true)
   }
 
   const handleUiVerify = async () => {
@@ -724,13 +767,28 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
     presentPendingStep()
   }
 
-  const journeyPastPayment =
+  const atOrPastPaymentStep =
     flowMode === 'ui'
       ? uiStage === 'documents' || uiStage === 'complete'
-      : stage === 'documents' || stage === 'complete'
+      : stage === 'confirm' || stage === 'documents' || stage === 'complete'
 
-  const showWheelCap =
-    !wheelSpunAndWon && !wheelOpen && !journeyPastPayment && !videoCallActive
+  const wheelEligible =
+    !wheelSpunAndWon &&
+    !atOrPastPaymentStep &&
+    !videoCallActive &&
+    !paymentModalOpen
+
+  useEffect(() => {
+    if (!wheelEligible || wheelAutoShownRef.current) return
+
+    const timer = window.setTimeout(() => {
+      if (wheelSpunAndWon || atOrPastPaymentStep || videoCallActive || paymentModalOpen) return
+      wheelAutoShownRef.current = true
+      setWheelOpen(true)
+    }, 20_000)
+
+    return () => window.clearTimeout(timer)
+  }, [wheelEligible, wheelSpunAndWon, atOrPastPaymentStep, videoCallActive, paymentModalOpen])
 
   const supportFaqSection = (
     <div className="space-y-3" data-scroll-anchor>
@@ -775,6 +833,14 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
         className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
       >
         <JackpotWheelModal open={wheelOpen} onClose={handleWheelClose} onPrize={handleWheelPrize} />
+        <PaymentCheckoutModal
+          open={paymentModalOpen}
+          onClose={() => !paymentModalBusy && setPaymentModalOpen(false)}
+          amount={paymentTarget === 'ui' ? getUiPaymentAmount() : getChatPaymentAmount()}
+          customerName={USER.firstName}
+          processing={paymentModalBusy}
+          onPay={handlePaymentModalPay}
+        />
         {videoCallActive && (
           <SupportAuraCall
             onEndCall={() => {
@@ -783,11 +849,6 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
             }}
           />
         )}
-        <WheelCornerTab
-          visible={showWheelCap}
-          onOpen={handleWheelReopen}
-          containerRef={appFrameRef}
-        />
         <div className="relative z-10 flex min-h-0 flex-1 flex-col pb-2">
       <Header
         flowMode={flowMode}

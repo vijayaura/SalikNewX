@@ -1,6 +1,6 @@
-import DemoOrchestrator from '../components/DemoOrchestrator'
+import MobileFrame from '../components/MobileFrame'
 
-/** CEO demo — WhatsApp → consent → three journeys */
+/** CEO demo — three journeys with per-lane WhatsApp → consent → renewal */
 export default function DemoPage() {
-  return <DemoOrchestrator />
+  return <MobileFrame />
 }

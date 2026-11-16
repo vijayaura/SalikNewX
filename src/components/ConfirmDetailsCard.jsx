@@ -19,6 +19,7 @@ import {
   VAT_RATE,
 } from '../data'
 import { COPY } from '../copy'
+import TermsAcceptanceLine from './TermsAcceptanceLine'
 
 const COLOR_OPTIONS = ['White', 'Black', 'Silver', 'Grey', 'Blue', 'Red', 'Pearl White']
 
@@ -191,10 +192,7 @@ export default function ConfirmDetailsCard({
         </div>
       </div>
 
-      <div className="flex items-start gap-2 w-full">
-        <Checkbox checked />
-        <p className="text-[10px] text-gray-600 leading-relaxed">{COPY.cards.terms}</p>
-      </div>
+      <TermsAcceptanceLine className="text-[10px] text-gray-600 leading-relaxed" />
 
       <div className="flex gap-2">
         <button
@@ -213,7 +211,7 @@ export default function ConfirmDetailsCard({
           }`}
         >
           <span className="relative z-[1]">
-            {processing ? 'Processing…' : COPY.buttons.proceedToPayment}
+            {processing ? 'Processing…' : COPY.buttons.agreeAndPay}
           </span>
         </button>
       </div>
@@ -394,18 +392,3 @@ function TogglePill({ active, onClick, children }) {
   )
 }
 
-function Checkbox({ checked }) {
-  return (
-    <div
-      className={`shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center mt-0.5 ${
-        checked ? 'bg-liva-orange border-liva-orange' : 'border-gray-300 bg-white'
-      }`}
-    >
-      {checked && (
-        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
-          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      )}
-    </div>
-  )
-}

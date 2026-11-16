@@ -21,6 +21,7 @@ export const COPY = {
     verify: 'Issue my policy',
     downloadQuote: 'Download Quote',
     proceedToPayment: 'Proceed to Payment',
+    agreeAndPay: 'Agree and Pay',
     reviewDetails: 'Review your details',
   },
   wheel: {

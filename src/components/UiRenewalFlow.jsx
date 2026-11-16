@@ -19,6 +19,8 @@ import {
 import AddonIcon from './AddonIcon'
 import DocumentUpload, { PolicyReady } from './DocumentUpload'
 import PlanCoverageModal from './PlanCoverageModal'
+import { COPY } from '../copy'
+import TermsAcceptanceLine from './TermsAcceptanceLine'
 
 function ToggleSwitch({ on, onToggle, disabled }) {
   return (
@@ -66,8 +68,6 @@ export default function UiRenewalFlow({
   const [coversPlan, setCoversPlan] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [hasClaims, setHasClaims] = useState(false)
-  const [termsOk, setTermsOk] = useState(false)
-  const [accuracyOk, setAccuracyOk] = useState(false)
   const [footerPremiumPulse, setFooterPremiumPulse] = useState(false)
   const vehicleValueInitialized = useRef(false)
 
@@ -95,7 +95,7 @@ export default function UiRenewalFlow({
   const minPolicyStart = useMemo(() => toInputDate(getTodayDate()), [])
   const policyEnd = policyStart ? addMonthsToDate(policyStart, 13) : ''
 
-  const payReady = Boolean(selectedPlan && termsOk && accuracyOk && !processing)
+  const payReady = Boolean(selectedPlan && !processing)
 
   if (stage === 'complete') {
     return (
@@ -382,29 +382,8 @@ export default function UiRenewalFlow({
           </AnimatePresence>
         </motion.div>
 
-        <motion.div layout className="mt-3 space-y-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-soft">
-          <label className="flex cursor-pointer items-start gap-2">
-            <input
-              type="checkbox"
-              checked={accuracyOk}
-              onChange={(e) => setAccuracyOk(e.target.checked)}
-              className="mt-0.5 accent-liva-orange"
-            />
-            <span className="text-[11px] leading-snug text-gray-700">
-              I confirm the vehicle and driver details provided are accurate
-            </span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-2">
-            <input
-              type="checkbox"
-              checked={termsOk}
-              onChange={(e) => setTermsOk(e.target.checked)}
-              className="mt-0.5 accent-liva-orange"
-            />
-            <span className="text-[11px] leading-snug text-gray-700">
-              I have read and accept the policy terms and the schedule of benefits
-            </span>
-          </label>
+        <motion.div layout className="mt-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-soft">
+          <TermsAcceptanceLine className="text-[11px] leading-snug text-gray-700" />
         </motion.div>
 
         <button
@@ -500,7 +479,7 @@ export default function UiRenewalFlow({
           className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-liva-orange py-2.5 text-[11px] font-semibold text-white shadow-btn-primary disabled:bg-gray-200 disabled:text-gray-400"
         >
           <ShieldCheck className="h-3.5 w-3.5" />
-          {processing ? 'Processing…' : 'Agree & Pay'}
+          {processing ? 'Processing…' : COPY.buttons.agreeAndPay}
         </button>
       </div>
 

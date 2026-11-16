@@ -1,7 +1,11 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
 import { SUPPORT } from '../data'
 import { buildSystemPrompt as buildBaseSystemPrompt } from './buildChatContext'
-import { getControversialFallback, isControversialQuery } from './contentGuard'
+import {
+  getOffTopicRedirect,
+  isControversialQuery,
+  isOffTopicQuery,
+} from './contentGuard'
 import { getLocalChatReply } from './localChat'
 
 const CHAT_API_URL = '/api/chat'
@@ -20,13 +24,19 @@ function buildFaqKnowledge() {
 function sanitizeAiReply(text, context) {
   const email = context?.supportEmail || SUPPORT.email
 
-  return text
+  let out = text
     .replace(/contactus\.uae@hsbc\.com/gi, email)
     .replace(/[\w.-]*@hsbc\.com/gi, email)
     .replace(
       /(Email:\s*)(?:[\w.-]+@hsbc\.com|contactus\.uae@hsbc\.com)/gi,
       `$1${email}`,
     )
+
+  if (/\bsalik\s+app\b/i.test(out)) {
+    return getOffTopicRedirect(context)
+  }
+
+  return out
 }
 
 function toConversationHistory(history) {
@@ -40,9 +50,9 @@ function buildFullSystemPrompt(context) {
   return `${buildBaseSystemPrompt(context)}
 
 Scope (strict):
-- Behave like an in-app call-centre advisor for this Salik × LIVA renewal — not a general chatbot.
-- Stay inside insurance renewal, UAE motoring, Salik, RTA, LIVA products, and Aura's role in this app.
-- Do not engage with controversy about the UAE, Dubai, Salik, LIVA, or Aura.
+- Behave like a call-centre advisor for LIVA motor insurance renewal — not a general chatbot.
+- Stay inside insurance renewal, UAE motoring, Salik toll roads (never say "Salik app"), RTA, LIVA products, and claims.
+- Do not engage with controversy about the UAE, Dubai, LIVA, or Aura.
 
 You can answer everyday UAE motoring and insurance questions using your knowledge — not only the FAQ list below.
 When FAQ knowledge applies, prefer it for LIVA product facts.
@@ -130,8 +140,8 @@ export async function getChatReply(query, { history = [], context }) {
 
   const localReply = () => ({ text: getLocalChatReply(trimmed, context), source: 'local' })
 
-  if (isControversialQuery(trimmed)) {
-    return { text: getControversialFallback(context), source: 'guard' }
+  if (isControversialQuery(trimmed) || isOffTopicQuery(trimmed)) {
+    return { text: getOffTopicRedirect(context), source: 'guard' }
   }
 
   if (!AI_ENABLED) {
