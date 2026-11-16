@@ -1,3 +1,14 @@
+const DEMO_HIGHLIGHTS = [
+  {
+    label: 'Spin wheel',
+    description: 'Jackpot modal after a few seconds — win add-ons or a premium discount.',
+  },
+  {
+    label: 'Call now',
+    description: 'Need support? Instant callback or in-app video without leaving the journey.',
+  },
+]
+
 const FLOW_POINTS = [
   {
     title: 'One continuous chat thread',
@@ -28,10 +39,24 @@ export default function FlowIntro() {
         Prototype demo
       </p>
       <h1 className="text-4xl xl:text-5xl font-bold text-white tracking-tight mb-4">Salik NewX</h1>
-      <p className="text-base text-white/60 leading-relaxed mb-10 max-w-md">
+      <p className="text-base text-white/60 leading-relaxed mb-6 max-w-md">
         An AI-guided insurance renewal flow — designed to show how a complex purchase can feel like
         a simple chat.
       </p>
+
+      <div className="mb-10">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {DEMO_HIGHLIGHTS.map((item) => (
+            <li
+              key={item.label}
+              className="rounded-2xl border border-liva-orange/35 bg-liva-orange/[0.12] px-4 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.06)_inset]"
+            >
+              <p className="text-sm font-bold text-white">{item.label}</p>
+              <p className="mt-1 text-xs leading-relaxed text-white/55">{item.description}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <ul className="space-y-5">
         {FLOW_POINTS.map((point, index) => (
