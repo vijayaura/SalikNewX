@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, ShieldCheck } from 'lucide-react'
 import { formatAED, getPlansWithPricing } from '../data'
 
 export default function PlanSelector({
@@ -35,15 +35,22 @@ export default function PlanSelector({
             } ${disabled ? 'opacity-60' : ''} ${showShimmer ? 'action-shimmer action-shimmer-plan ring-1 ring-liva-orange/25' : ''}`}
           >
             <div className="relative p-2 pb-3">
-              {plan.badge && (
-                <span
-                  className={`pointer-events-none absolute top-1.5 right-1.5 rounded px-1 py-px text-[7px] font-bold leading-tight uppercase ${
-                    plan.badge === 'BY LAW' ? 'bg-gray-800 text-white' : 'bg-liva-orange text-white'
-                  }`}
-                >
-                  {plan.badge}
-                </span>
-              )}
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-liva-orange to-liva-orange-light shadow-sm">
+                  <ShieldCheck className="h-3.5 w-3.5 text-white" strokeWidth={2.25} />
+                </div>
+                {plan.badge && (
+                  <span
+                    className={`pointer-events-none shrink-0 rounded px-1 py-px text-[6px] font-bold leading-tight uppercase ${
+                      plan.badge === 'BY LAW'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-white text-liva-orange ring-1 ring-liva-orange/30'
+                    }`}
+                  >
+                    {plan.badge}
+                  </span>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -51,7 +58,7 @@ export default function PlanSelector({
                 onClick={() => onSelect(plan.id)}
                 className="w-full text-left"
               >
-                <p className="text-[11px] font-semibold text-gray-900 leading-tight pr-8">
+                <p className="text-[11px] font-semibold text-gray-900 leading-tight">
                   {plan.name}
                 </p>
                 {plan.subtitle && (

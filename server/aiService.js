@@ -1,171 +1,76 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { AnthropicFoundry } from '@anthropic-ai/foundry-sdk'
-
 /**
- * @typedef {Object} ChatMessage
- * @property {'user' | 'assistant'} role
- * @property {string} content
+ * Core42 Compass — OpenAI-compatible chat completions (server-side only).
  */
 
-/**
- * @typedef {Object} SendChatMessageOptions
- * @property {string} message - Latest user message
- * @property {ChatMessage[]} [conversationHistory] - Prior turns (user/assistant only)
- * @property {string} [systemPrompt] - Optional system instructions for Claude
- * @property {number} [maxTokens] - Response length cap
- * @property {number} [temperature] - Sampling temperature (0–1)
- */
+/** @typedef {Object} ChatMessage */
+/** @property {'user' | 'assistant'} role */
+/** @property {string} content */
 
-/** Azure deployment name — override via ANTHROPIC_MODEL. */
-const DEFAULT_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_BASE_URL = 'https://api.core42.ai/v1'
+const DEFAULT_MODEL = 'gpt-4.1'
 const DEFAULT_MAX_TOKENS = 512
 const DEFAULT_TEMPERATURE = 0.35
 
-/** Lazy singleton so we don't recreate the client on every request. */
-let cachedClient = null
-let cachedClientKey = ''
-
 function readApiKey(env = process.env) {
-  return (
-    env.ANTHROPIC_API_KEY ||
-    env.ANTHROPIC_FOUNDRY_API_KEY ||
-    env.CLAUDE_API_KEY ||
-    ''
-  ).trim()
+  return (env.CORE42_API_KEY || env.COMPASS_API_KEY || '').trim()
 }
 
 function readBaseUrl(env = process.env) {
-  const explicit =
-    env.ANTHROPIC_FOUNDRY_BASE_URL ||
-    env.ANTHROPIC_BASE_URL ||
-    ''
-
-  if (explicit.trim()) {
-    return explicit.trim().replace(/\/$/, '')
-  }
-
-  const resource = env.ANTHROPIC_FOUNDRY_RESOURCE?.trim()
-  if (resource) {
-    return `https://${resource}.services.ai.azure.com/anthropic`
-  }
-
-  return ''
+  const raw = env.CORE42_BASE_URL || env.COMPASS_BASE_URL || DEFAULT_BASE_URL
+  return raw.trim().replace(/\/$/, '')
 }
 
-function readResourceName(env = process.env) {
-  const explicit = env.ANTHROPIC_FOUNDRY_RESOURCE?.trim()
-  if (explicit) return explicit
-
-  const baseUrl = readBaseUrl(env)
-  const match = baseUrl.match(/https:\/\/([^.]+)\.services\.ai\.azure\.com/)
-  return match?.[1] || ''
-}
-
-function isDirectAnthropicKey(apiKey) {
-  return typeof apiKey === 'string' && apiKey.startsWith('sk-ant-')
-}
-
-function usesFoundry(env = process.env) {
-  return Boolean(readBaseUrl(env) || env.ANTHROPIC_FOUNDRY_RESOURCE?.trim())
-}
-
-/**
- * Build a Claude client.
- * - Azure Foundry → AnthropicFoundry (matches Azure portal Python sample)
- * - Direct Anthropic API → Anthropic
- */
-function createClient(env = process.env) {
-  const apiKey = readApiKey(env)
-  if (!apiKey) return null
-
-  const baseUrl = readBaseUrl(env)
-  const resource = readResourceName(env)
-  const cacheKey = `${apiKey}|${baseUrl}|${resource}|${usesFoundry(env)}`
-
-  if (cachedClient && cachedClientKey === cacheKey) {
-    return cachedClient
-  }
-
-  if (usesFoundry(env)) {
-    /** @type {import('@anthropic-ai/foundry-sdk').FoundryClientOptions} */
-    const foundryOptions = { apiKey }
-
-    // SDK requires baseURL OR resource — not both
-    if (baseUrl) {
-      foundryOptions.baseURL = baseUrl
-    } else if (resource) {
-      foundryOptions.resource = resource
-    }
-
-    cachedClient = new AnthropicFoundry(foundryOptions)
-  } else {
-    cachedClient = new Anthropic({ apiKey })
-  }
-
-  cachedClientKey = cacheKey
-  return cachedClient
-}
-
-/** True when an API key is present (does not verify the key works). */
-export function isClaudeConfigured(env = process.env) {
+export function isChatAiConfigured(env = process.env) {
   return Boolean(readApiKey(env))
 }
 
-/** Surface config gaps before calling Claude (e.g. Azure key without base URL). */
-export function getClaudeConfigStatus(env = process.env) {
+/** @deprecated Use isChatAiConfigured — kept for imports that still reference Claude. */
+export const isClaudeConfigured = isChatAiConfigured
+
+export function getChatAiConfigStatus(env = process.env) {
   const apiKey = readApiKey(env)
-  const baseUrl = readBaseUrl(env)
-  const foundry = usesFoundry(env)
-  const needsBaseUrl = Boolean(apiKey) && !isDirectAnthropicKey(apiKey) && !foundry
-
   return {
-    configured: Boolean(apiKey) && !needsBaseUrl,
-    needsBaseUrl,
-    provider: foundry ? 'azure-foundry' : 'anthropic',
-    resource: readResourceName(env) || undefined,
-    baseUrl: baseUrl || undefined,
+    configured: Boolean(apiKey),
+    needsBaseUrl: false,
+    provider: 'core42',
+    baseUrl: readBaseUrl(env),
   }
 }
 
-/** Read model / generation settings from env with sensible defaults. */
-export function getClaudeSettings(env = process.env) {
+export const getClaudeConfigStatus = getChatAiConfigStatus
+
+export function getChatAiSettings(env = process.env) {
   return {
-    model: env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL,
-    maxTokens: Number(env.ANTHROPIC_MAX_TOKENS) || DEFAULT_MAX_TOKENS,
-    temperature: Number(env.ANTHROPIC_TEMPERATURE) || DEFAULT_TEMPERATURE,
+    model: env.CORE42_MODEL?.trim() || env.COMPASS_MODEL?.trim() || DEFAULT_MODEL,
+    maxTokens: Number(env.CORE42_MAX_TOKENS || env.COMPASS_MAX_TOKENS) || DEFAULT_MAX_TOKENS,
+    temperature: Number(env.CORE42_TEMPERATURE || env.COMPASS_TEMPERATURE) || DEFAULT_TEMPERATURE,
   }
 }
+
+export const getClaudeSettings = getChatAiSettings
 
 /**
- * Send a multi-turn chat request to Claude and return the assistant text.
- * All API keys stay server-side — never pass the key from the frontend.
+ * Send a multi-turn chat request and return assistant text.
  */
 export async function sendChatMessage(options, env = process.env) {
-  const status = getClaudeConfigStatus(env)
-  if (!readApiKey(env)) {
-    throw new Error('ANTHROPIC_API_KEY is not configured')
-  }
-  if (status.needsBaseUrl) {
-    throw new Error('Set ANTHROPIC_FOUNDRY_BASE_URL for Azure Foundry keys (from Azure portal)')
-  }
-
-  const client = createClient(env)
-  if (!client) {
-    throw new Error('ANTHROPIC_API_KEY is not configured')
+  const apiKey = readApiKey(env)
+  if (!apiKey) {
+    throw new Error('CORE42_API_KEY is not configured')
   }
 
   const {
     message,
     conversationHistory = [],
-    systemPrompt = 'You are a helpful assistant.',
+    systemPrompt = 'You are Aura, a helpful in-app insurance advisor for LIVA in the UAE.',
     maxTokens,
     temperature,
   } = options
 
-  const settings = getClaudeSettings(env)
+  const settings = getChatAiSettings(env)
+  const baseUrl = readBaseUrl(env)
 
-  // Map prior turns, then append the latest user message
   const messages = [
+    { role: 'system', content: String(systemPrompt) },
     ...conversationHistory.map(({ role, content }) => ({
       role: role === 'assistant' ? 'assistant' : 'user',
       content: String(content),
@@ -173,22 +78,31 @@ export async function sendChatMessage(options, env = process.env) {
     { role: 'user', content: String(message) },
   ]
 
-  const response = await client.messages.create({
-    model: settings.model,
-    max_tokens: maxTokens ?? settings.maxTokens,
-    temperature: temperature ?? settings.temperature,
-    system: systemPrompt,
-    messages,
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages,
+      max_tokens: maxTokens ?? settings.maxTokens,
+      temperature: temperature ?? settings.temperature,
+    }),
   })
 
-  const text = response.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim()
+  const data = await response.json().catch(() => ({}))
 
+  if (!response.ok) {
+    const detail =
+      data?.error?.message || data?.message || data?.error || `HTTP ${response.status}`
+    throw new Error(typeof detail === 'string' ? detail : 'Core42 chat request failed')
+  }
+
+  const text = data?.choices?.[0]?.message?.content?.trim()
   if (!text) {
-    throw new Error('Claude returned an empty response')
+    throw new Error('Core42 returned an empty response')
   }
 
   return text

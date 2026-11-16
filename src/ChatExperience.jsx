@@ -8,13 +8,23 @@ import PlanSelector from './components/PlanSelector'
 import AddonGrid from './components/AddonGrid'
 import ConfirmDetailsCard from './components/ConfirmDetailsCard'
 import DocumentUpload, { PolicyReady } from './components/DocumentUpload'
-import { VEHICLE, clampInsuredValue, getPlanById, getStepAfterPlanSelect, isComprehensivePlan } from './data'
+import {
+  VEHICLE,
+  addonsAfterPlanChange,
+  clampInsuredValue,
+  formatAED,
+  getPlanById,
+  getStepAfterPlanSelect,
+  isComprehensivePlan,
+  toggleAddonSelection,
+} from './data'
 import { FAQ_SUGGESTIONS } from './data/faqs'
 import { buildChatContext } from './services/buildChatContext'
 import { checkAiAvailable, getChatReply } from './services/aiChat'
 import { detectRevisionIntent } from './services/localChat'
 import { getControversialFallback, isControversialQuery } from './services/contentGuard'
 import { getAlreadyOnStepReply, getPendingStep, getProceedCta, resolveRevisionIntent } from './services/journeyGuide'
+import { syncJourneyMessages } from './services/journeySync'
 import ChatInput from './components/ChatInput'
 import IntroMessage from './components/IntroMessage'
 import AddonsIntroMessage from './components/AddonsIntroMessage'
@@ -22,6 +32,9 @@ import ConfirmIntroMessage from './components/ConfirmIntroMessage'
 import PaymentMessage from './components/PaymentMessage'
 import SupportCallbackCard from './components/SupportCallbackCard'
 import PoweredByInster from './components/PoweredByInster'
+import JackpotWheelModal from './components/JackpotWheelModal'
+import WheelCornerTab from './components/WheelCornerTab'
+import UiRenewalFlow from './components/UiRenewalFlow'
 import { COPY } from './copy'
 import { addMonthsToDate, getTodayDate } from './data'
 
@@ -50,7 +63,51 @@ export default function ChatExperience({ embedHost = false }) {
   const [supportRequestKey, setSupportRequestKey] = useState(0)
   const [journeyEngaged, setJourneyEngaged] = useState(false)
   const [resumeFlow, setResumeFlow] = useState(null)
+  const [flowMode, setFlowMode] = useState('chat')
+  const [uiStage, setUiStage] = useState('plan')
+  const [uiSelectedPlan, setUiSelectedPlan] = useState('agency')
+  const [uiSelectedAddons, setUiSelectedAddons] = useState([])
+  const [uiVehicleValue, setUiVehicleValueRaw] = useState(VEHICLE.value)
+  const setUiVehicleValue = useCallback((value) => {
+    setUiVehicleValueRaw((prev) => clampInsuredValue(typeof value === 'function' ? value(prev) : value))
+  }, [])
+  const [uiPolicyStart, setUiPolicyStart] = useState(getTodayDate)
+  const [uiProcessing, setUiProcessing] = useState(false)
+  const [wheelOpen, setWheelOpen] = useState(false)
+  const [premiumDiscountPercent, setPremiumDiscountPercent] = useState(0)
+  const [wheelOrangeCard, setWheelOrangeCard] = useState(false)
+  const [wheelSpunAndWon, setWheelSpunAndWon] = useState(false)
+  const [showWheelTab, setShowWheelTab] = useState(false)
   const chatRef = useRef(null)
+  const appFrameRef = useRef(null)
+  const wheelWonRef = useRef(false)
+  const wheelPromptTimerRef = useRef(null)
+
+  const scheduleWheelPrompt = useCallback((delayMs) => {
+    clearTimeout(wheelPromptTimerRef.current)
+    if (wheelWonRef.current) return
+    wheelPromptTimerRef.current = setTimeout(() => {
+      if (!wheelWonRef.current) setWheelOpen(true)
+    }, delayMs)
+  }, [])
+
+  useEffect(() => {
+    scheduleWheelPrompt(5000)
+    return () => clearTimeout(wheelPromptTimerRef.current)
+  }, [scheduleWheelPrompt])
+
+  const handleWheelClose = useCallback(() => {
+    setWheelOpen(false)
+    if (!wheelWonRef.current) {
+      setShowWheelTab(true)
+      scheduleWheelPrompt(60_000)
+    }
+  }, [scheduleWheelPrompt])
+
+  const handleWheelReopen = useCallback(() => {
+    clearTimeout(wheelPromptTimerRef.current)
+    setWheelOpen(true)
+  }, [])
 
   const markJourneyEngaged = useCallback(() => setJourneyEngaged(true), [])
 
@@ -70,6 +127,47 @@ export default function ChatExperience({ embedHost = false }) {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
     })
   }, [])
+
+  const handleWheelPrize = useCallback(
+    (prize) => {
+      let nextOrangeCard = wheelOrangeCard
+      let nextDiscount = premiumDiscountPercent
+
+      if (prize.type === 'discount') {
+        nextDiscount = prize.percent
+        setPremiumDiscountPercent(prize.percent)
+        wheelWonRef.current = true
+        setWheelSpunAndWon(true)
+        setShowWheelTab(false)
+        clearTimeout(wheelPromptTimerRef.current)
+        setWheelOpen(false)
+      } else if (prize.type === 'orange-card') {
+        nextOrangeCard = true
+        setWheelOrangeCard(true)
+        const withOrange = (prev) => (prev.includes('orange-card') ? prev : [...prev, 'orange-card'])
+        setSelectedAddons(withOrange)
+        setUiSelectedAddons(withOrange)
+        wheelWonRef.current = true
+        setWheelSpunAndWon(true)
+        setShowWheelTab(false)
+        clearTimeout(wheelPromptTimerRef.current)
+        setWheelOpen(false)
+      }
+
+      if (prize.type === 'discount' || prize.type === 'orange-card') {
+        setMessages(
+          syncJourneyMessages({
+            stage,
+            selectedPlan,
+            wheelOrangeCard: nextOrangeCard,
+            premiumDiscountPercent: nextDiscount,
+          }),
+        )
+        requestAnimationFrame(() => scrollToLatest())
+      }
+    },
+    [stage, selectedPlan, wheelOrangeCard, premiumDiscountPercent, scrollToLatest],
+  )
 
   const scrollToStep = useCallback((target) => {
     requestAnimationFrame(() => {
@@ -95,16 +193,15 @@ export default function ChatExperience({ embedHost = false }) {
   }, [])
 
   useEffect(() => {
-    if (stage === 'welcome') {
-      setTyping(true)
-      const t1 = setTimeout(() => {
-        setTyping(false)
-        setMessages(['greeting', 'vehicle', 'plan'])
-        setStage('plan')
-      }, 1200)
-      return () => clearTimeout(t1)
-    }
-  }, [stage])
+    if (flowMode !== 'chat' || stage !== 'welcome') return
+    setTyping(true)
+    const t1 = setTimeout(() => {
+      setTyping(false)
+      setMessages(['greeting', 'vehicle', 'plan'])
+      setStage('plan')
+    }, 1200)
+    return () => clearTimeout(t1)
+  }, [stage, flowMode])
 
   const completeNotified = useRef(false)
   useEffect(() => {
@@ -123,7 +220,7 @@ export default function ChatExperience({ embedHost = false }) {
     markJourneyEngaged()
     setSelectedPlan(planId)
     if (!isComprehensivePlan(planId)) {
-      setSelectedAddons([])
+      setSelectedAddons(addonsAfterPlanChange(wheelOrangeCard))
     }
     const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
@@ -155,7 +252,7 @@ export default function ChatExperience({ embedHost = false }) {
     const plan = getPlanById(selectedPlan, vehicleValue)
     const blob = new Blob(
       [
-        `LIVA Insurance Quote\n\nPolicy Holder: Rashid Khan\nInsured Value: ${vehicleValue.toLocaleString()} AED\nPlan: ${plan?.name}\nPlate: ${VEHICLE.plate}\nPolicy Period: ${policyStart} – ${addMonthsToDate(policyStart, 13)}`,
+        `LIVA Insurance Quote\n\nPolicy Holder: Rashid Khan\nInsured Value: ${formatAED(vehicleValue)}\nPlan: ${plan?.name}\nPlate: ${VEHICLE.plate}\nPolicy Period: ${policyStart} – ${addMonthsToDate(policyStart, 13)}`,
       ],
       { type: 'text/plain' },
     )
@@ -235,9 +332,7 @@ export default function ChatExperience({ embedHost = false }) {
     markJourneyEngaged()
     setRedoDraft((prev) => ({
       ...prev,
-      addons: prev.addons.includes(id)
-        ? prev.addons.filter((a) => a !== id)
-        : [...prev.addons, id],
+      addons: toggleAddonSelection(prev.addons, id, { wheelOrangeCardWon: wheelOrangeCard }),
     }))
   }
 
@@ -266,8 +361,16 @@ export default function ChatExperience({ embedHost = false }) {
     if (stage !== 'addons') return
     markJourneyEngaged()
     setSelectedAddons((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
+      toggleAddonSelection(prev, id, { wheelOrangeCardWon: wheelOrangeCard }),
     )
+  }
+
+  const addonGridProps = {
+    wheelOrangeCard,
+  }
+  const confirmWheelProps = {
+    wheelOrangeCard,
+    premiumDiscountPercent,
   }
 
   const handleDownload = () => {
@@ -303,7 +406,7 @@ export default function ChatExperience({ embedHost = false }) {
     }
     setSelectedPlan(planId)
     if (!isComprehensivePlan(planId)) {
-      setSelectedAddons([])
+      setSelectedAddons(addonsAfterPlanChange(wheelOrangeCard))
     }
     const plan = getPlanById(planId, vehicleValue)
     registerAction(COPY.user.plan(plan?.name))
@@ -380,9 +483,65 @@ export default function ChatExperience({ embedHost = false }) {
     setResumeFlow(null)
   }
 
+  const handleFlowModeChange = useCallback((mode) => {
+    setFlowMode(mode)
+    if (mode === 'chat' && !redoFlow) {
+      setJourneyEngaged(false)
+      requestAnimationFrame(() => scrollToLatest())
+    }
+  }, [redoFlow, scrollToLatest])
+
+  const handleUiSelectPlan = (planId) => {
+    setUiSelectedPlan(planId)
+    if (!isComprehensivePlan(planId)) {
+      setUiSelectedAddons(addonsAfterPlanChange(wheelOrangeCard))
+    }
+  }
+
+  const handleUiToggleAddon = (id) => {
+    setUiSelectedAddons((prev) =>
+      toggleAddonSelection(prev, id, { wheelOrangeCardWon: wheelOrangeCard }),
+    )
+  }
+
+  const handleUiDownloadQuote = () => {
+    const plan = getPlanById(uiSelectedPlan, uiVehicleValue)
+    const blob = new Blob(
+      [
+        `LIVA Insurance Quote\n\nPolicy Holder: Rashid Khan\nInsured Value: ${formatAED(uiVehicleValue)}\nPlan: ${plan?.name}\nPlate: ${VEHICLE.plate}\nPolicy Period: ${uiPolicyStart} – ${addMonthsToDate(uiPolicyStart, 13)}`,
+      ],
+      { type: 'text/plain' },
+    )
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'LIVA-Quote-Rashid-Khan.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleUiAgreePay = async () => {
+    if (!uiSelectedPlan) return
+    setUiProcessing(true)
+    await delay(1800)
+    setUiProcessing(false)
+    setUiStage('documents')
+  }
+
+  const handleUiVerify = async () => {
+    setUiProcessing(true)
+    await delay(2000)
+    setUiProcessing(false)
+    setUiStage('complete')
+  }
+
   const handleSupport = async () => {
     if (supportLoading) return
-    setJourneyEngaged(false)
+    if (flowMode === 'ui') {
+      setFlowMode('chat')
+    } else if (!redoFlow) {
+      setJourneyEngaged(false)
+    }
     setSupportLoading(true)
     setSupportVisible(false)
     scrollToLatest()
@@ -394,8 +553,9 @@ export default function ChatExperience({ embedHost = false }) {
   }
 
   const handleFaqSend = async (query) => {
-    if (!redoFlow) setJourneyEngaged(false)
-    const anchor = stageToAnchor(stage)
+    if (flowMode === 'chat' && !redoFlow) setJourneyEngaged(false)
+    const anchor =
+      supportVisible || supportLoading ? 'support' : stageToAnchor(stage)
     const id = Date.now()
     const history = faqMessages
     const revision = detectRevisionIntent(query)
@@ -450,7 +610,7 @@ export default function ChatExperience({ embedHost = false }) {
     if (isControversialQuery(query)) {
       setFaqMessages((prev) => [
         ...prev,
-        { id: id + 1, role: 'ai', text: getControversialFallback(context), afterStep: anchor },
+        { id: id + 1, role: 'ai', text: getControversialFallback(context), afterStep: anchor, source: 'guard' },
       ])
       scrollToLatest()
       return
@@ -461,7 +621,7 @@ export default function ChatExperience({ embedHost = false }) {
 
     const { text, source } = await getChatReply(query, { history, context })
 
-    if (source === 'claude') {
+    if (source === 'ai') {
       setAiConnected(true)
     } else if (source === 'error') {
       setAiConnected(false)
@@ -469,19 +629,22 @@ export default function ChatExperience({ embedHost = false }) {
 
     setFaqTyping(false)
     setFaqTypingAnchor(null)
-    setFaqMessages((prev) => [...prev, { id: id + 1, role: 'ai', text, afterStep: anchor }])
+    setFaqMessages((prev) => [...prev, { id: id + 1, role: 'ai', text, afterStep: anchor, source }])
   }
+
+  const hasSupportThread = faqMessages.some((m) => m.afterStep === 'support')
 
   const proceedCta = getProceedCta({ stage, redoFlow })
   const hasChatted = faqMessages.some((m) => m.role === 'user')
   const divertedFromJourney = hasChatted || supportVisible || supportLoading
-  const chatDiverted = !journeyEngaged && divertedFromJourney
-  const showProceedBadge = Boolean(proceedCta && chatDiverted)
+  const journeyPaused = flowMode === 'chat' && divertedFromJourney
+  const chatDiverted = journeyPaused && !journeyEngaged
+  const showProceedBadge = flowMode === 'chat' && Boolean(proceedCta && chatDiverted)
   const resumeLocked = chatDiverted && !!resumeFlow
 
-  const planLocked = stage !== 'plan' || !!redoFlow || divertedFromJourney
-  const addonsLocked = stage !== 'addons' || !!redoFlow || divertedFromJourney
-  const confirmLocked = !!redoFlow || divertedFromJourney
+  const planLocked = stage !== 'plan' || !!redoFlow || journeyPaused
+  const addonsLocked = stage !== 'addons' || !!redoFlow || journeyPaused
+  const confirmLocked = !!redoFlow || journeyPaused
   const docsLocked = chatDiverted
   const redoLocked = chatDiverted && !!redoFlow
   const journeyLocked = !!redoFlow
@@ -500,10 +663,44 @@ export default function ChatExperience({ embedHost = false }) {
   }
 
   return (
-      <div className="relative flex flex-col h-full min-h-0 bg-white">
+      <div
+        ref={appFrameRef}
+        className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
+      >
+        <JackpotWheelModal open={wheelOpen} onClose={handleWheelClose} onPrize={handleWheelPrize} />
+        <WheelCornerTab
+          visible={!wheelSpunAndWon && !wheelOpen && showWheelTab}
+          onOpen={handleWheelReopen}
+          containerRef={appFrameRef}
+        />
         <div className="relative z-10 flex min-h-0 flex-1 flex-col pb-2">
-      <Header onContactSupport={handleSupport} supportLoading={supportLoading} />
+      <Header
+        flowMode={flowMode}
+        onFlowModeChange={handleFlowModeChange}
+        onContactSupport={handleSupport}
+        supportLoading={supportLoading}
+      />
 
+      {flowMode === 'ui' ? (
+        <UiRenewalFlow
+          stage={uiStage}
+          vehicleValue={uiVehicleValue}
+          onVehicleValueChange={setUiVehicleValue}
+          selectedPlan={uiSelectedPlan}
+          onSelectPlan={handleUiSelectPlan}
+          selectedAddons={uiSelectedAddons}
+          onToggleAddon={handleUiToggleAddon}
+          policyStart={uiPolicyStart}
+          onPolicyStartChange={setUiPolicyStart}
+          onDownloadQuote={handleUiDownloadQuote}
+          onAgreePay={handleUiAgreePay}
+          onVerifyDocs={handleUiVerify}
+          onDownloadPolicy={handleDownload}
+          processing={uiProcessing}
+          wheelOrangeCard={wheelOrangeCard}
+          premiumDiscountPercent={premiumDiscountPercent}
+        />
+      ) : (
       <main ref={chatRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-8 pt-1">
         <div className="relative z-10 space-y-3 pb-6">
         <LockedSection locked={journeyLocked}>
@@ -549,7 +746,9 @@ export default function ChatExperience({ embedHost = false }) {
         />
 
         <AnimatePresence>
-          {messages.includes('addons') && isComprehensivePlan(frozenPlan) && resumeFlow?.step !== 'addons' && (
+          {(messages.includes('addons') || wheelOrangeCard) &&
+            (wheelOrangeCard || (frozenPlan && isComprehensivePlan(frozenPlan))) &&
+            resumeFlow?.step !== 'addons' && (
             <motion.div key="addons" data-journey="addons" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={journeyLocked}>
                 <UserAction delay={0}>{userActions[0]}</UserAction>
@@ -566,6 +765,7 @@ export default function ChatExperience({ embedHost = false }) {
                     disabled={addonsLocked}
                     onContinue={stage === 'addons' && !redoFlow ? handleConfirmAddons : undefined}
                     highlightNext={highlightAddons && !addonsLocked}
+                    {...addonGridProps}
                   />
                 </div>
               </LockedSection>
@@ -581,7 +781,9 @@ export default function ChatExperience({ embedHost = false }) {
         />
 
         <AnimatePresence>
-          {messages.includes('confirm') && resumeFlow?.step !== 'confirm' && (
+          {(messages.includes('confirm') || premiumDiscountPercent > 0) &&
+            selectedPlan &&
+            resumeFlow?.step !== 'confirm' && (
             <motion.div key="confirm" data-journey="confirm" data-scroll-anchor initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <LockedSection locked={confirmLocked}>
                 <UserAction delay={0}>{userActions[1] ?? userActions[0]}</UserAction>
@@ -601,6 +803,7 @@ export default function ChatExperience({ embedHost = false }) {
                     onProceed={handlePay}
                     processing={processing && stage === 'confirm' && !redoFlow}
                     highlightNext={highlightConfirm && !confirmLocked}
+                    {...confirmWheelProps}
                   />
                 </div>
               </LockedSection>
@@ -690,7 +893,8 @@ export default function ChatExperience({ embedHost = false }) {
                 </>
               )}
 
-              {redoFlow.step === 'addons' && isComprehensivePlan(activePlanId) && (
+              {redoFlow.step === 'addons' &&
+                (isComprehensivePlan(activePlanId) || wheelOrangeCard) && (
                 <>
                   <ChatBubble role="ai">
                     <AddonsIntroMessage />
@@ -703,6 +907,7 @@ export default function ChatExperience({ embedHost = false }) {
                       disabled={redoLocked}
                       onContinue={redoLocked ? undefined : handleRedoConfirmAddons}
                       highlightNext={highlightAddons && !redoLocked}
+                      {...addonGridProps}
                     />
                   </div>
                 </>
@@ -726,6 +931,7 @@ export default function ChatExperience({ embedHost = false }) {
                       onProceed={handlePay}
                       processing={processing}
                       highlightNext={highlightConfirm && !redoLocked}
+                      {...confirmWheelProps}
                     />
                   </div>
                 </>
@@ -733,33 +939,6 @@ export default function ChatExperience({ embedHost = false }) {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {supportLoading && (
-          <ChatBubble role="ai">
-            <TypingDots />
-          </ChatBubble>
-        )}
-
-        <AnimatePresence>
-          {supportVisible && (
-            <motion.div
-              key="support-callback"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="ml-9"
-              data-scroll-anchor
-            >
-              <SupportCallbackCard key={supportRequestKey} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {faqTyping && !faqTypingAnchor && (
-          <ChatBubble role="ai">
-            <TypingDots />
-          </ChatBubble>
-        )}
 
         <AnimatePresence>
           {resumeFlow && (
@@ -798,6 +977,7 @@ export default function ChatExperience({ embedHost = false }) {
                       disabled={resumeLocked}
                       onContinue={resumeLocked ? undefined : handleResumeConfirmAddons}
                       highlightNext={!resumeLocked}
+                      {...addonGridProps}
                     />
                   </div>
                 </>
@@ -824,6 +1004,7 @@ export default function ChatExperience({ embedHost = false }) {
                       onProceed={handleResumePay}
                       processing={processing && (stage === 'confirm' || !!redoFlow)}
                       highlightNext={!resumeLocked}
+                      {...confirmWheelProps}
                     />
                   </div>
                 </>
@@ -848,9 +1029,46 @@ export default function ChatExperience({ embedHost = false }) {
           )}
         </AnimatePresence>
 
+        {(supportLoading || supportVisible || hasSupportThread) && (
+          <div className="space-y-3" data-scroll-anchor>
+            {supportLoading && (
+              <ChatBubble role="ai">
+                <TypingDots />
+              </ChatBubble>
+            )}
+            <AnimatePresence>
+              {supportVisible && (
+                <motion.div
+                  key="support-callback"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="ml-9"
+                >
+                  <SupportCallbackCard
+                    key={supportRequestKey}
+                    onClose={() => setSupportVisible(false)}
+                    planHint={
+                      selectedPlan ? getPlanById(selectedPlan, vehicleValue)?.name : undefined
+                    }
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <FaqThread
+              messages={faqMessages}
+              anchor="support"
+              typing={faqTyping}
+              activeAnchor={faqTypingAnchor}
+            />
+          </div>
+        )}
+
         </div>
       </main>
+      )}
 
+      {flowMode === 'chat' && (
       <div className="shrink-0 px-3 pb-2 pt-1 flex flex-col items-center gap-1.5">
         <PoweredByInster />
 
@@ -890,6 +1108,7 @@ export default function ChatExperience({ embedHost = false }) {
           />
         </div>
       </div>
+      )}
         </div>
       </div>
   )
@@ -920,7 +1139,7 @@ function FaqThread({ messages, anchor, typing, activeAnchor }) {
   return (
     <>
       {thread.map((msg) => (
-        <ChatBubble key={msg.id} role={msg.role} scrollAnchor>
+        <ChatBubble key={msg.id} role={msg.role} scrollAnchor replySource={msg.source}>
           {msg.role === 'ai' ? <FormattedMessage text={msg.text} /> : msg.text}
         </ChatBubble>
       ))}

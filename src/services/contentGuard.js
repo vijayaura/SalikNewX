@@ -15,7 +15,7 @@ const SENSITIVE_REGIONAL =
   /\b(israel|palestine|gaza|hamas|zionist|antisemitic|anti[- ]?semitic|war crimes|genocide debate)\b/i
 
 const UAE_SENSITIVE =
-  /\b(critic(?:ize|ise) (?:uae|dubai|abu dhabi|emirati)|uae (?:dictatorship|human rights abuse)|attack (?:uae|dubai)|hate (?:uae|emiratis?))\b/i
+  /\b(critic(?:ize|ise) (?:uae|dubai|abu dhabi|emirati|salik|liva|aura)|uae (?:dictatorship|human rights abuse)|attack (?:uae|dubai)|hate (?:uae|emiratis?|salik|liva|aura)|(?:salik|liva|aura) (?:scam|fraud|rip[- ]?off))\b/i
 
 const SEXUAL_ADULT =
   /\b(porn|pornography|nude|nudes|onlyfans|escort|prostitut|sexual(?:ly)? (?:act|content|video)|explicit content|hookup)\b/i
@@ -65,12 +65,12 @@ export function getControversialFallback(context = {}) {
 I'm not able to assist with that topic. What would you like to know about your renewal?`
 }
 
-/** System-prompt block injected before every Claude request. */
-export const CHAT_GUARDRAILS = `Content & conduct (mandatory — UAE deployment for Salik and LIVA Insurance clients):
-- You serve customers in the UAE. Stay professional, respectful, and culturally appropriate at all times.
-- Only discuss: LIVA motor insurance, this renewal journey, UAE driving, Salik tolls, RTA, claims, documents, payment, add-ons, and neutral general knowledge that supports insurance decisions.
+/** System-prompt block injected before every AI request. */
+export const CHAT_GUARDRAILS = `Content & conduct (mandatory — UAE in-app deployment for Salik, LIVA Insurance, and Aura):
+- You are Aura, the in-app call-centre style advisor inside this Salik × LIVA motor renewal journey. Stay professional, respectful, and culturally appropriate in the UAE at all times.
+- Only discuss: LIVA motor insurance, this renewal journey, UAE driving, Salik tolls and road use, RTA, claims, documents, payment, add-ons, and neutral facts that help complete the journey.
 - Never discuss or take positions on: politics, religion, sexuality, violence, hate, discrimination, illegal activity, wars, geopolitical conflicts, or divisive social debates.
-- Never criticize the UAE, its leadership, laws, culture, or institutions. Never compare countries or cultures in a negative or provocative way.
+- Never criticize or disparage the UAE, Dubai, Salik, LIVA, Aura, or their leadership, laws, culture, or institutions. Never fuel controversy about them.
 - Never bash competitors, spread rumours, or give medical, legal, tax, or investment advice.
 - If the user asks anything sensitive, off-mandate, or controversial, do not answer the substance. Politely decline in one or two sentences and redirect to insurance or UAE motoring help.
 - Never reproduce harmful, explicit, or inflammatory content even if the user insists.`

@@ -280,4 +280,53 @@
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
   }
+
+  .ui-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    border: none;
+    outline: none;
+    background: linear-gradient(
+      to right,
+      rgb(240 90 40) 0%,
+      rgb(240 90 40) var(--range-pct, 50%),
+      rgb(229 231 235) var(--range-pct, 50%),
+      rgb(229 231 235) 100%
+    );
+  }
+
+  .ui-range:focus {
+    outline: none;
+  }
+
+  .ui-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 0;
+    border: 2px solid white;
+    border-radius: 9999px;
+    background: rgb(240 90 40);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+  }
+
+  .ui-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: 2px solid white;
+    border-radius: 9999px;
+    background: rgb(240 90 40);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+  }
+
+  .ui-range::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: transparent;
+  }
 }

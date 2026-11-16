@@ -1,4 +1,4 @@
-import { SUPPORT } from '../data'
+import { SUPPORT, formatAED } from '../data'
 
 export const FAQS = [
   {
@@ -20,7 +20,7 @@ export const FAQS = [
     keywords: ['addon', 'add-on', 'upgrade', 'optional', 'extra cover', 'off road', 'gcc', 'rent a car', 'ncd'],
     question: 'What are optional upgrades?',
     answer:
-      'Optional upgrades are available on comprehensive plans only: GCC territory extension (500 AED), NCD Protection (250 AED), Premium Rent A Car (200 AED), and Off Road cover (250 AED).',
+      `Optional upgrades are available on comprehensive plans only: GCC territory extension (${formatAED(500)}), NCD Protection (${formatAED(250)}), Premium Rent A Car (${formatAED(200)}), and Off Road cover (${formatAED(250)}).`,
   },
   {
     id: 'documents',
@@ -69,7 +69,7 @@ export const FAQS = [
     keywords: ['vehicle value', 'car value', 'valuation', 'land cruiser', '160'],
     question: 'How is my vehicle value calculated?',
     answer:
-      'Vehicle value is based on your car model, year, and current market valuation. Your Toyota Land Cruiser 2022 is valued at 160,400 AED for this quote.',
+      `Vehicle value is based on your car model, year, and current market valuation. Your Toyota Land Cruiser 2022 is valued at ${formatAED(160400)} for this quote.`,
   },
 ]
 

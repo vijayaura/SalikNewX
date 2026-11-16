@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const status = error.statusCode || 500
 
     if (status >= 500) {
-      console.error('[api/chat] Claude request failed:', error.message)
+      console.error('[api/chat] Core42 request failed:', error.message)
     }
 
     const clientMessage =

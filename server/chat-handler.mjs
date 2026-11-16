@@ -1,4 +1,9 @@
-import { getClaudeConfigStatus, getClaudeSettings, isClaudeConfigured, sendChatMessage } from './aiService.js'
+import {
+  getChatAiConfigStatus,
+  getChatAiSettings,
+  isChatAiConfigured,
+  sendChatMessage,
+} from './aiService.js'
 import { getControversialFallback, isControversialQuery } from '../src/services/contentGuard.js'
 
 /**
@@ -61,22 +66,22 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
-/** Health check — confirms the server has a key configured (no Claude call). */
+/** Health check — confirms the server has a key configured (no model call). */
 export function getChatHealth(env = process.env) {
-  const settings = getClaudeSettings(env)
-  const status = getClaudeConfigStatus(env)
+  const settings = getChatAiSettings(env)
+  const status = getChatAiConfigStatus(env)
 
   return {
     ok: status.configured,
     provider: status.provider,
     model: settings.model,
     configured: status.configured,
-    needsBaseUrl: status.needsBaseUrl,
+    needsBaseUrl: false,
   }
 }
 
 /**
- * Core handler: validate input, call Claude via aiService, return { response }.
+ * Core handler: validate input, call Core42 via aiService, return { response, source }.
  */
 export async function handleChatRequest(body, env = process.env) {
   const validation = validateChatRequest(body)
@@ -86,21 +91,14 @@ export async function handleChatRequest(body, env = process.env) {
     throw error
   }
 
-  if (!isClaudeConfigured(env)) {
-    const error = new Error('Claude API is not configured on the server')
-    error.statusCode = 503
-    throw error
-  }
-
-  const configStatus = getClaudeConfigStatus(env)
-  if (configStatus.needsBaseUrl) {
-    const error = new Error('Set ANTHROPIC_BASE_URL for Azure Foundry keys')
+  if (!isChatAiConfigured(env)) {
+    const error = new Error('Core42 API is not configured on the server')
     error.statusCode = 503
     throw error
   }
 
   if (isControversialQuery(body.message)) {
-    return { response: getControversialFallback() }
+    return { response: getControversialFallback(), source: 'guard' }
   }
 
   const response = await sendChatMessage(
@@ -115,7 +113,7 @@ export async function handleChatRequest(body, env = process.env) {
     env,
   )
 
-  return { response }
+  return { response, source: 'ai' }
 }
 
 /** Vite dev / preview middleware for /api/chat */
@@ -161,7 +159,7 @@ export function createChatMiddleware(env) {
 
       // Log details server-side only — never expose keys or raw API errors to clients
       if (status >= 500) {
-        console.error('[api/chat] Claude request failed:', error.message)
+        console.error('[api/chat] Core42 request failed:', error.message)
       }
 
       const clientMessage =

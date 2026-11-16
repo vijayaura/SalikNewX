@@ -1,3 +1,5 @@
+import { formatAED } from '../data'
+
 export const GENERAL_KNOWLEDGE = [
   {
     id: 'salik',
@@ -45,7 +47,7 @@ export const GENERAL_KNOWLEDGE = [
     id: 'gcc',
     keywords: ['gcc', 'oman', 'bahrain', 'ksa', 'saudi', 'drive abroad'],
     answer:
-      'GCC extension is an optional add-on that extends your cover when driving in other GCC countries. It\'s available as an upgrade in the add-ons step for 60 AED.',
+      `GCC extension is an optional add-on that extends your cover when driving in other GCC countries. It's available as an upgrade in the add-ons step for ${formatAED(60)}.`,
   },
   {
     id: 'agency-repair',

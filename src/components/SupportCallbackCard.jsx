@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Clock, Headset, Phone } from 'lucide-react'
+import { Calendar, Clock, Headset, Phone, Video } from 'lucide-react'
 import { USER, formatDisplayDate, fromInputDate, getTodayDate, toInputDate } from '../data'
+import SupportGoogleMeet from './SupportGoogleMeet'
+import SupportVideoCall from './SupportVideoCall'
 
 function formatUaeMobile(mobile) {
   const digits = mobile.replace(/\D/g, '')
@@ -36,11 +38,11 @@ function getIn15MinutesLabel() {
   return formatTimeLabel(date)
 }
 
-const CALLBACK_OPTIONS = [
+const PHONE_CALLBACK_OPTIONS = [
   {
     id: 'now',
-    label: 'Call me now',
-    desc: 'Connect right away',
+    label: 'Call now',
+    desc: 'Video call with an advisor instantly',
     Icon: Phone,
   },
   {
@@ -55,7 +57,41 @@ const CALLBACK_OPTIONS = [
     desc: 'Pick a date and time',
     Icon: Calendar,
   },
+  {
+    id: 'meet',
+    label: 'Google Meet',
+    desc: 'Video meeting with your advisor',
+    Icon: Video,
+  },
 ]
+
+function SupportOptionButton({ id, label, desc, Icon, onSelect, primary = false }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+        primary
+          ? 'border-liva-orange bg-liva-orange text-white shadow-btn-primary hover:bg-liva-orange-light'
+          : 'border-gray-200 bg-white hover:border-liva-orange/35 hover:bg-liva-orange/[0.03]'
+      }`}
+    >
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+          primary ? 'bg-white/20' : 'bg-liva-orange/10'
+        }`}
+      >
+        <Icon className={`h-4 w-4 ${primary ? 'text-white' : 'text-liva-orange'}`} strokeWidth={2} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={`text-xs font-semibold leading-tight ${primary ? 'text-white' : 'text-gray-900'}`}>
+          {label}
+        </p>
+        <p className={`mt-0.5 text-[10px] ${primary ? 'text-white/80' : 'text-gray-500'}`}>{desc}</p>
+      </div>
+    </button>
+  )
+}
 
 function SupportPulseIcon() {
   return (
@@ -98,7 +134,7 @@ function OnTheWayIndicator() {
   )
 }
 
-export default function SupportCallbackCard() {
+export default function SupportCallbackCard({ onClose, planHint }) {
   const [step, setStep] = useState('choose')
   const [choice, setChoice] = useState(null)
   const [scheduleDate, setScheduleDate] = useState(toInputDate(getTodayDate()))
@@ -109,6 +145,14 @@ export default function SupportCallbackCard() {
 
   const handleChoose = (optionId) => {
     setChoice(optionId)
+    if (optionId === 'now') {
+      setStep('video-call')
+      return
+    }
+    if (optionId === 'meet') {
+      setStep('google-meet')
+      return
+    }
     if (optionId === 'schedule') {
       setStep('schedule')
       return
@@ -116,8 +160,31 @@ export default function SupportCallbackCard() {
     setStep('confirmed')
   }
 
+  const handleEndVideoCall = () => {
+    setChoice(null)
+    if (onClose) onClose()
+    else setStep('choose')
+  }
+
   const handleConfirmSchedule = () => {
     setStep('confirmed')
+  }
+
+  if (step === 'video-call') {
+    return <SupportVideoCall onEndCall={handleEndVideoCall} />
+  }
+
+  if (step === 'google-meet') {
+    return (
+      <SupportGoogleMeet
+        planHint={planHint}
+        onClose={() => {
+          setChoice(null)
+          if (onClose) onClose()
+          else setStep('choose')
+        }}
+      />
+    )
   }
 
   if (step === 'choose') {
@@ -136,36 +203,16 @@ export default function SupportCallbackCard() {
         </p>
 
         <div className="space-y-2">
-          {CALLBACK_OPTIONS.map(({ id, label, desc, Icon }) => (
-            <button
+          {PHONE_CALLBACK_OPTIONS.map(({ id, label, desc, Icon }) => (
+            <SupportOptionButton
               key={id}
-              type="button"
-              onClick={() => handleChoose(id)}
-              className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                id === 'now'
-                  ? 'border-liva-orange bg-liva-orange text-white shadow-btn-primary hover:bg-liva-orange-light'
-                  : 'border-gray-200 bg-white hover:border-liva-orange/35 hover:bg-liva-orange/[0.03]'
-              }`}
-            >
-              <div
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                  id === 'now' ? 'bg-white/20' : 'bg-liva-orange/10'
-                }`}
-              >
-                <Icon
-                  className={`h-4 w-4 ${id === 'now' ? 'text-white' : 'text-liva-orange'}`}
-                  strokeWidth={2}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-xs font-semibold leading-tight ${id === 'now' ? 'text-white' : 'text-gray-900'}`}>
-                  {label}
-                </p>
-                <p className={`mt-0.5 text-[10px] ${id === 'now' ? 'text-white/80' : 'text-gray-500'}`}>
-                  {desc}
-                </p>
-              </div>
-            </button>
+              id={id}
+              label={label}
+              desc={desc}
+              Icon={Icon}
+              primary={id === 'now'}
+              onSelect={handleChoose}
+            />
           ))}
         </div>
       </motion.div>
@@ -256,16 +303,7 @@ export default function SupportCallbackCard() {
     >
       <SupportPulseIcon />
 
-      {choice === 'now' ? (
-        <>
-          <p className="mb-1 text-xs font-bold text-gray-900">Connecting you to support</p>
-          <p className="mx-auto max-w-[220px] text-[11px] leading-relaxed text-gray-600">
-            A customer care executive will call you in a moment on {phoneLabel}.
-          </p>
-          <OnTheWayIndicator />
-        </>
-      ) : (
-        <>
+      <>
           <p className="mb-1 text-xs font-bold text-gray-900">Callback scheduled</p>
           <p className="mx-auto max-w-[240px] text-[11px] leading-relaxed text-gray-600">
             {choice === '15min' ? (
@@ -293,8 +331,7 @@ export default function SupportCallbackCard() {
                 : formatDisplayDate(fromInputDate(scheduleDate))}
             </span>
           </motion.div>
-        </>
-      )}
+      </>
     </motion.div>
   )
 }

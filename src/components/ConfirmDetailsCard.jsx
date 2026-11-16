@@ -7,6 +7,7 @@ import {
   VEHICLE,
   addMonthsToDate,
   calculateTotal,
+  clampPolicyStartDate,
   formatAED,
   formatDisplayDate,
   formatVehicleLabel,
@@ -15,6 +16,7 @@ import {
   getSelectedAddonItems,
   getTodayDate,
   toInputDate,
+  VAT_RATE,
 } from '../data'
 import { COPY } from '../copy'
 
@@ -32,6 +34,8 @@ export default function ConfirmDetailsCard({
   onProceed,
   processing,
   highlightNext = false,
+  wheelOrangeCard = false,
+  premiumDiscountPercent = 0,
 }) {
   const [hasClaims, setHasClaims] = useState(false)
   const [email, setEmail] = useState(USER.email)
@@ -40,8 +44,16 @@ export default function ConfirmDetailsCard({
   const [emiratesIdExpiry, setEmiratesIdExpiry] = useState(USER.emiratesIdExpiry)
 
   const plan = getPlanById(planId, vehicleValue)
-  const { vat, total } = calculateTotal(plan?.price ?? 0, selectedAddons, planId)
-  const selectedAddonItems = getSelectedAddonItems(planId, selectedAddons)
+  const calcOpts = { includeOrangeCard: wheelOrangeCard, premiumDiscountPercent }
+  const { vat, total, preDiscountSubtotal, planSavings } = calculateTotal(
+    plan?.price ?? 0,
+    selectedAddons,
+    planId,
+    calcOpts,
+  )
+  const selectedAddonItems = getSelectedAddonItems(planId, selectedAddons, {
+    includeOrangeCard: wheelOrangeCard,
+  })
   const policyEnd = addMonthsToDate(policyStart, 13)
   const minPolicyStart = toInputDate(getTodayDate())
 
@@ -148,14 +160,34 @@ export default function ConfirmDetailsCard({
 
       <div className="card-surface-warm p-3 space-y-1.5">
         <p className="text-xs font-bold text-gray-900">{COPY.cards.yourPlan}</p>
+        {premiumDiscountPercent > 0 && planSavings > 0 && (
+          <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">
+            {premiumDiscountPercent}% wheel offer applied
+          </p>
+        )}
         <PriceRow label={plan?.name ?? 'Plan'} value={formatAED(plan?.price ?? 0)} />
         {selectedAddonItems.map((addon) => (
-          <PriceRow key={addon.id} label={addon.shortName} value={formatAED(addon.price)} />
+          <PriceRow
+            key={addon.id}
+            label={
+              addon.wheelPrize
+                ? `${addon.shortName} (wheel prize)`
+                : addon.shortName
+            }
+            value={formatAED(addon.price)}
+          />
         ))}
         <PriceRow label="VAT" value={formatAED(vat)} />
         <div className="flex justify-between pt-1.5 border-t border-liva-orange/15">
           <span className="text-xs font-bold text-gray-900">Total Premium (with VAT)</span>
-          <span className="text-sm font-bold text-gray-900 tabular-nums">{formatAED(total)}</span>
+          <div className="text-right">
+            {premiumDiscountPercent > 0 && planSavings > 0 && (
+              <p className="text-[10px] font-medium text-gray-400 line-through tabular-nums">
+                {formatAED(preDiscountSubtotal + Math.round(preDiscountSubtotal * VAT_RATE))}
+              </p>
+            )}
+            <span className="text-sm font-bold text-gray-900 tabular-nums">{formatAED(total)}</span>
+          </div>
         </div>
       </div>
 
@@ -317,7 +349,7 @@ function EditableDateRow({ label, value, onChange, shaded, min }) {
           value={inputValue}
           min={min}
           onChange={(e) => {
-            if (e.target.value) onChange(fromInputDate(e.target.value))
+            if (e.target.value) onChange(clampPolicyStartDate(fromInputDate(e.target.value)))
           }}
           onBlur={() => setEditing(false)}
           autoFocus

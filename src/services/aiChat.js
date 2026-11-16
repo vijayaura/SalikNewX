@@ -9,16 +9,14 @@ const HEALTH_API_URL = '/api/chat/health'
 const AI_ENABLED = import.meta.env.VITE_AI_ENABLED !== 'false'
 const REQUEST_TIMEOUT_MS = 30_000
 
-const AZURE_SETUP_HINT =
-  'Your API key looks like Azure Foundry. Add ANTHROPIC_BASE_URL to .env (from the Azure portal), then restart the dev server.'
+const CORE42_SETUP_HINT =
+  'AI chat is not configured on the server. Add CORE42_API_KEY to .env and restart the dev server.'
 
 function buildFaqKnowledge() {
   return FAQS.map((faq) => `- ${faq.question} ${faq.answer}`).join('\n')
 }
 
-/**
- * Claude sometimes hallucinates legacy HSBC contact details for LIVA — force correct support info.
- */
+/** Strip legacy partner contacts the model might hallucinate. */
 function sanitizeAiReply(text, context) {
   const email = context?.supportEmail || SUPPORT.email
 
@@ -31,7 +29,6 @@ function sanitizeAiReply(text, context) {
     )
 }
 
-/** Map in-app chat rows to the API conversationHistory shape. */
 function toConversationHistory(history) {
   return history.slice(-8).map((msg) => ({
     role: msg.role === 'user' ? 'user' : 'assistant',
@@ -42,7 +39,12 @@ function toConversationHistory(history) {
 function buildFullSystemPrompt(context) {
   return `${buildBaseSystemPrompt(context)}
 
-You can answer general real-world questions (UAE driving, Salik, insurance concepts, etc.) using your knowledge — not only the FAQ list below.
+Scope (strict):
+- Behave like an in-app call-centre advisor for this Salik × LIVA renewal — not a general chatbot.
+- Stay inside insurance renewal, UAE motoring, Salik, RTA, LIVA products, and Aura's role in this app.
+- Do not engage with controversy about the UAE, Dubai, Salik, LIVA, or Aura.
+
+You can answer everyday UAE motoring and insurance questions using your knowledge — not only the FAQ list below.
 When FAQ knowledge applies, prefer it for LIVA product facts.
 
 Always format replies with Markdown (**bold**, *italics*, "- " bullet lines, blank lines between sections).
@@ -55,10 +57,7 @@ Official LIVA support (use exactly — no other emails or partners):
 - Email: ${context.supportEmail}`
 }
 
-/**
- * Call POST /api/chat — Claude runs on the server; the API key never reaches the browser.
- */
-async function callClaudeChat(message, conversationHistory, systemPrompt) {
+async function callAiChat(message, conversationHistory, systemPrompt) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
@@ -77,9 +76,9 @@ async function callClaudeChat(message, conversationHistory, systemPrompt) {
     }
 
     const text = data.response?.trim()
-    if (!text) throw new Error('Claude returned an empty response')
+    if (!text) throw new Error('AI returned an empty response')
 
-    return text
+    return { text, source: 'ai' }
   } finally {
     clearTimeout(timeout)
   }
@@ -117,9 +116,8 @@ export async function getAiSetupHint() {
   try {
     const response = await fetch(HEALTH_API_URL, { signal: AbortSignal.timeout(4000) })
     const data = await response.json()
-    if (data.needsBaseUrl) return AZURE_SETUP_HINT
+    if (!data.ok) return CORE42_SETUP_HINT
   } catch {
-    /* ignore */
   }
   return null
 }
@@ -143,11 +141,11 @@ export async function getChatReply(query, { history = [], context }) {
   try {
     const conversationHistory = toConversationHistory(history)
     const systemPrompt = buildFullSystemPrompt(context)
-    const rawText = await callClaudeChat(trimmed, conversationHistory, systemPrompt)
+    const { text: rawText } = await callAiChat(trimmed, conversationHistory, systemPrompt)
     const text = sanitizeAiReply(rawText, context)
 
     aiReady = true
-    return { text, source: 'claude' }
+    return { text, source: 'ai' }
   } catch (error) {
     aiReady = false
 
@@ -172,7 +170,7 @@ export async function getChatReply(query, { history = [], context }) {
     }
 
     return {
-      text: error?.message || 'Something went wrong reaching Claude. Please try again.',
+      text: error?.message || 'Something went wrong reaching Aura AI. Please try again.',
       source: 'error',
     }
   }
@@ -183,5 +181,5 @@ export async function checkAiAvailable(force = false) {
 }
 
 export function getChatMode() {
-  return AI_ENABLED ? 'claude' : 'local'
+  return AI_ENABLED ? 'core42' : 'local'
 }

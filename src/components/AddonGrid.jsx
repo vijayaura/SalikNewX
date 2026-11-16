@@ -1,30 +1,6 @@
-import { Car, Check, Globe2, Mountain, ShieldCheck } from 'lucide-react'
-import { formatAED, getAddonsForPlan } from '../data'
-
-const ADDON_ICONS = {
-  gcc: { Icon: Globe2, bg: 'bg-teal-500', light: 'bg-teal-50' },
-  ncd: { Icon: ShieldCheck, bg: 'bg-emerald-500', light: 'bg-emerald-50' },
-  'rent-a-car': { Icon: Car, bg: 'bg-blue-500', light: 'bg-blue-50' },
-  offroad: { Icon: Mountain, bg: 'bg-orange-600', light: 'bg-orange-50' },
-}
-
-function AddonIcon({ id, selected }) {
-  const config = ADDON_ICONS[id] ?? { Icon: Car, bg: 'bg-gray-500', light: 'bg-gray-50' }
-  const { Icon, bg, light } = config
-
-  return (
-    <div
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
-        selected ? bg : light
-      }`}
-    >
-      <Icon
-        className={`h-4 w-4 ${selected ? 'text-white' : 'text-gray-600'}`}
-        strokeWidth={2}
-      />
-    </div>
-  )
-}
+import { Check } from 'lucide-react'
+import { formatAED, getAddonCatalog } from '../data'
+import AddonIcon from './AddonIcon'
 
 export default function AddonGrid({
   planId,
@@ -33,8 +9,9 @@ export default function AddonGrid({
   disabled,
   onContinue,
   highlightNext = false,
+  wheelOrangeCard = false,
 }) {
-  const addons = getAddonsForPlan(planId)
+  const addons = getAddonCatalog(planId, { includeOrangeCard: wheelOrangeCard })
   const selectedCount = selectedAddons.filter((id) => addons.some((a) => a.id === id)).length
   const selectedTotal = addons
     .filter((a) => selectedAddons.includes(a.id))
@@ -45,24 +22,32 @@ export default function AddonGrid({
   return (
     <div className="mt-1 space-y-2">
       <div className="flex items-center gap-2 px-0.5">
-        <p className="text-xs font-bold text-gray-900">Optional Upgrades</p>
+        <p className="text-xs font-bold text-gray-900">
+          {wheelOrangeCard ? 'Optional upgrades & rewards' : 'Optional Upgrades'}
+        </p>
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500">
-          comprehensive only
+          {wheelOrangeCard ? 'incl. wheel prize' : 'comprehensive only'}
         </span>
       </div>
 
       <div className="card-surface-muted divide-y divide-gray-100/80">
         {addons.map((addon) => {
-          const selected = selectedAddons.includes(addon.id)
+          const isWheelPrize = addon.wheelPrize && wheelOrangeCard
+          const selected = isWheelPrize || selectedAddons.includes(addon.id)
+          const locked = isWheelPrize
 
           return (
             <button
               key={addon.id}
               type="button"
-              disabled={disabled}
-              onClick={() => onToggle(addon.id)}
+              disabled={disabled || locked}
+              onClick={() => !locked && onToggle(addon.id)}
               className={`flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left transition-all ${
-                selected ? 'bg-liva-orange/[0.04]' : 'bg-white hover:bg-gray-50/80'
+                isWheelPrize
+                  ? 'bg-liva-orange/[0.06]'
+                  : selected
+                    ? 'bg-liva-orange/[0.04]'
+                    : 'bg-white hover:bg-gray-50/80'
               } ${disabled ? 'pointer-events-none opacity-50' : ''}`}
             >
               <div
@@ -74,7 +59,14 @@ export default function AddonGrid({
               <AddonIcon id={addon.id} selected={selected} />
 
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold leading-tight text-gray-900">{addon.shortName}</p>
+                <p className="text-xs font-semibold leading-tight text-gray-900">
+                  {addon.shortName}
+                  {isWheelPrize && (
+                    <span className="ml-1 rounded bg-liva-orange px-1 py-px text-[7px] font-bold uppercase text-white">
+                      Wheel prize
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-[10px] leading-snug text-gray-500">{addon.desc}</p>
               </div>
 

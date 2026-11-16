@@ -140,10 +140,25 @@ export const ADDONS = [
   },
 ]
 
+/** Wheel prize — shown in add-ons when customer wins the spin. */
+export const WHEEL_ORANGE_CARD_ID = 'orange-card'
+
+export const ORANGE_CARD_ADDON = {
+  id: WHEEL_ORANGE_CARD_ID,
+  name: 'LIVA Orange Card',
+  shortName: 'Orange Card',
+  desc: 'Exclusive member benefits & partner perks',
+  price: 0,
+  comprehensiveOnly: false,
+  wheelPrize: true,
+}
+
 export const VAT_RATE = 0.05
 
 export function formatAED(amount) {
-  return `${amount.toLocaleString('en-AE')} AED`
+  const value = typeof amount === 'number' ? amount : Number(amount)
+  if (!Number.isFinite(value)) return 'AED 0'
+  return `AED ${value.toLocaleString('en-AE')}`
 }
 
 /** Scale a plan premium proportionally to sum insured (comprehensive plans only). */
@@ -172,13 +187,35 @@ export function getAddonsForPlan(planId) {
   return ADDONS
 }
 
-export function getSelectedAddonItems(planId, addonIds) {
-  const allowed = new Set(getAddonsForPlan(planId).map((a) => a.id))
-  return ADDONS.filter((a) => allowed.has(a.id) && addonIds.includes(a.id))
+export function getAddonCatalog(planId, { includeOrangeCard = false } = {}) {
+  const base = planId ? getAddonsForPlan(planId) : []
+  if (!includeOrangeCard) return base
+  return [ORANGE_CARD_ADDON, ...base]
+}
+
+export function getSelectedAddonItems(planId, addonIds, options = {}) {
+  const catalog = planId
+    ? getAddonCatalog(planId, options)
+    : [...ADDONS, ...(options.includeOrangeCard ? [ORANGE_CARD_ADDON] : [])]
+  const allowed = new Set(catalog.map((a) => a.id))
+  return catalog.filter((a) => allowed.has(a.id) && addonIds.includes(a.id))
 }
 
 export function getStepAfterPlanSelect(planId) {
   return isComprehensivePlan(planId) ? 'addons' : 'confirm'
+}
+
+/** Toggle add-on selection; wheel Orange Card cannot be turned off once won. */
+export function toggleAddonSelection(prev, id, { wheelOrangeCardWon = false } = {}) {
+  if (wheelOrangeCardWon && id === WHEEL_ORANGE_CARD_ID && prev.includes(WHEEL_ORANGE_CARD_ID)) {
+    return prev
+  }
+  return prev.includes(id) ? prev.filter((addonId) => addonId !== id) : [...prev, id]
+}
+
+/** Keep wheel Orange Card when clearing comprehensive-only add-ons (e.g. plan change). */
+export function addonsAfterPlanChange(wheelOrangeCardWon) {
+  return wheelOrangeCardWon ? [WHEEL_ORANGE_CARD_ID] : []
 }
 
 export function clampInsuredValue(value, limits = VALUE_LIMITS) {
@@ -225,6 +262,22 @@ export function fromInputDate(isoDate) {
   return `${parseInt(day, 10)}/${parseInt(month, 10)}/${year}`
 }
 
+function dateDmYToUtcMs(dateStr) {
+  const [day, month, year] = dateStr.split('/').map(Number)
+  return Date.UTC(year, month - 1, day)
+}
+
+/** Compare DD/MM/YYYY dates: negative if a before b, 0 if equal, positive if a after b. */
+export function compareDmY(a, b) {
+  return dateDmYToUtcMs(a) - dateDmYToUtcMs(b)
+}
+
+/** Policy start must not be before today (DD/MM/YYYY). */
+export function clampPolicyStartDate(dateStr) {
+  const today = getTodayDate()
+  return compareDmY(dateStr, today) < 0 ? today : dateStr
+}
+
 /** Vehicle label e.g. TOYOTA LAND CRUISER 2022 */
 export function formatVehicleLabel(model, year) {
   return `${model} ${year}`.toUpperCase()
@@ -240,12 +293,29 @@ export function getDaysUntilExpiry(dateStr) {
   return Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-export function calculateTotal(planPrice, addonIds, planId) {
-  const addonItems = planId ? getSelectedAddonItems(planId, addonIds) : ADDONS.filter((a) => addonIds.includes(a.id))
+export function calculateTotal(planPrice, addonIds, planId, options = {}) {
+  const { includeOrangeCard = false, premiumDiscountPercent = 0 } = options
+  const addonItems = planId
+    ? getSelectedAddonItems(planId, addonIds, { includeOrangeCard })
+    : ADDONS.filter((a) => addonIds.includes(a.id))
   const addonsTotal = addonItems.reduce((sum, a) => sum + a.price, 0)
-  const subtotal = planPrice + addonsTotal
+  const discountedPlan =
+    premiumDiscountPercent > 0
+      ? Math.round(planPrice * (1 - premiumDiscountPercent / 100))
+      : planPrice
+  const planSavings = planPrice - discountedPlan
+  const subtotal = discountedPlan + addonsTotal
   const vat = Math.round(subtotal * VAT_RATE)
-  return { subtotal, vat, total: subtotal + vat, addonsTotal }
+  return {
+    subtotal,
+    vat,
+    total: subtotal + vat,
+    addonsTotal,
+    discountedPlan,
+    planSavings,
+    premiumDiscountPercent,
+    preDiscountSubtotal: planPrice + addonsTotal,
+  }
 }
 
 export const CROSS_SELL = [

@@ -1,9 +1,17 @@
 import { motion } from 'framer-motion'
 import { User } from 'lucide-react'
 import { LivaAvatar } from './LivaLogo'
+import ChatReplySource from './ChatReplySource'
 
-export default function ChatBubble({ role, children, delay = 0, scrollAnchor = false }) {
+export default function ChatBubble({
+  role,
+  children,
+  delay = 0,
+  scrollAnchor = false,
+  replySource,
+}) {
   const isAI = role === 'ai'
+  const showAiBadge = isAI && replySource === 'ai'
 
   return (
     <motion.div
@@ -23,12 +31,19 @@ export default function ChatBubble({ role, children, delay = 0, scrollAnchor = f
 
       <div className={`max-w-[88%] ${isAI ? '' : 'text-right'}`}>
         <div
-          className={`rounded-xl px-3 py-2 text-[13px] ${
+          className={`relative rounded-xl px-3 py-2 text-[13px] ${
+            showAiBadge ? 'pt-5' : ''
+          } ${
             isAI
               ? 'text-gray-800 rounded-tl-sm border border-gray-100 shadow-bubble-ai texture-bubble leading-relaxed'
               : 'bg-liva-orange text-white rounded-tr-sm shadow-bubble-user leading-snug'
           }`}
         >
+          {showAiBadge && (
+            <div className="pointer-events-none absolute right-2 top-1.5 z-[1]">
+              <ChatReplySource source={replySource} />
+            </div>
+          )}
           {children}
         </div>
       </div>
