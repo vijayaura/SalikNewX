@@ -35,9 +35,6 @@ const OFF_TOPIC_EXTREME =
 const OFF_TOPIC_GENERAL =
   /\b(salik\s+app|download (?:the )?app|play store|app store|weather forecast|recipe|netflix|movie|celebrity|dating|bitcoin|football score|who is the president|capital of)\b/i
 
-const INSURANCE_SCOPE =
-  /\b(insur|renew|liva|plan|comprehensive|third party|addon|add-?on|claim|premium|policy|vehicle|car|toyota|plate|insured|emirates|rta|dubai|uae|driv|motor|salik|toll|document|upload|payment|vat|cover|wheel|aura|garage|dealer|ncd|gcc|support|quote|expir)\b/i
-
 const BLOCK_PATTERNS = [
   POLITICS,
   RELIGION_DEBATE,
@@ -61,22 +58,9 @@ export function isControversialQuery(query) {
   return BLOCK_PATTERNS.some((pattern) => pattern.test(text))
 }
 
-/**
- * Broader off-mandate check — unrelated questions with no insurance / UAE motoring signal.
- */
+/** Explicit off-mandate only (controversial / clearly unrelated) — do not block normal insurance Q&A. */
 export function isOffTopicQuery(query) {
-  const text = query?.trim()
-  if (!text) return false
-  if (isControversialQuery(text)) return true
-
-  if (text.length > 14 && !INSURANCE_SCOPE.test(text)) {
-    const looksLikeQuestion =
-      /\?/.test(text) ||
-      /^(what|who|where|when|why|how|tell|explain|can you|could you|do you|is there)\b/i.test(text)
-    if (looksLikeQuestion) return true
-  }
-
-  return false
+  return isControversialQuery(query)
 }
 
 /**
@@ -101,7 +85,7 @@ export function getOffTopicRedirectInstruction(context = {}) {
   return `Off-topic & sensitive replies (mandatory):
 - Only answer LIVA motor insurance renewal and UAE motoring (plans, cover, claims, documents, payment, add-ons, RTA, Salik toll roads).
 - Never refer to a "Salik app" — there is no Salik app in this chat; Salik may only mean Dubai road tolls when relevant to driving.
-- For controversial, silly, unrelated, or out-of-scope questions, do NOT answer the substance. Reply with exactly this text (keep the vehicle as "${context.vehicle || 'your vehicle'}"):
+- For controversial, silly, or clearly unrelated (non-insurance) questions only, do NOT answer the substance. Reply with exactly this text (keep the vehicle as "${context.vehicle || 'your vehicle'}"). When in doubt, answer helpful motor-insurance content:
 
 ${sample}`
 }

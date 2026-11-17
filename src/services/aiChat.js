@@ -1,11 +1,7 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
 import { SUPPORT } from '../data'
 import { buildSystemPrompt as buildBaseSystemPrompt } from './buildChatContext'
-import {
-  getOffTopicRedirect,
-  isControversialQuery,
-  isOffTopicQuery,
-} from './contentGuard'
+import { getOffTopicRedirect, isControversialQuery } from './contentGuard'
 import { getLocalChatReply } from './localChat'
 
 const CHAT_API_URL = '/api/chat'
@@ -140,7 +136,7 @@ export async function getChatReply(query, { history = [], context }) {
 
   const localReply = () => ({ text: getLocalChatReply(trimmed, context), source: 'local' })
 
-  if (isControversialQuery(trimmed) || isOffTopicQuery(trimmed)) {
+  if (isControversialQuery(trimmed)) {
     return { text: getOffTopicRedirect(context), source: 'guard' }
   }
 

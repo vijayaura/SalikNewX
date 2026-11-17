@@ -1,6 +1,6 @@
 import { FAQS, FAQ_FALLBACK } from '../data/faqs'
 import { GENERAL_KNOWLEDGE } from '../data/generalKnowledge'
-import { getOffTopicRedirect, isOffTopicQuery } from './contentGuard'
+import { getOffTopicRedirect, isControversialQuery } from './contentGuard'
 
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -141,6 +141,14 @@ function contextReply(query, context) {
     return 'Policies run for 12 months from your start date. You will be notified before renewal is due.'
   }
 
+  if (/\b(accident|crash|collision|hit)\b/.test(lower)) {
+    return 'Report accidents to police when required and notify LIVA within 24 hours on 800 722. Keep your policy number and any police report ready for claims.'
+  }
+
+  if (/\b(mandatory|compulsory|required by law|illegal|fine)\b/.test(lower)) {
+    return 'Motor insurance is mandatory in the UAE. Third Party is the legal minimum; Comprehensive also covers your own vehicle. Driving uninsured can mean fines and impound.'
+  }
+
   return null
 }
 
@@ -148,7 +156,7 @@ export function getLocalChatReply(query, context) {
   const trimmed = query.trim()
   if (!trimmed) return FAQ_FALLBACK
 
-  if (isOffTopicQuery(trimmed)) {
+  if (isControversialQuery(trimmed)) {
     return getOffTopicRedirect(context)
   }
 
@@ -171,7 +179,7 @@ export function getLocalChatReply(query, context) {
   const general = findGeneralKnowledge(trimmed)
   if (general) return general.answer
 
-  return getOffTopicRedirect(context)
+  return `I'm not sure about that, ${context.customerName}. Try a suggestion below or ask about Comprehensive cover, claims, or RTA — or call ${context.supportPhone} for live help.`
 }
 
 export function findFaqAnswer(query) {
