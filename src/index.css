@@ -250,6 +250,55 @@
       background-position: -120% 0;
     }
   }
+
+  .support-live-icon {
+    @apply relative inline-flex shrink-0 items-center justify-center;
+  }
+
+  .support-live-icon::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    background: rgb(234 88 12 / 0.22);
+    animation: support-live-glow 2.2s ease-in-out infinite;
+  }
+
+  .support-live-icon svg {
+    position: relative;
+    z-index: 1;
+    animation: support-headset-live 2.2s ease-in-out infinite;
+  }
+
+  .support-live-icon--loading::before {
+    animation-duration: 0.85s;
+  }
+
+  .support-live-icon--loading svg {
+    animation-duration: 0.85s;
+  }
+
+  @keyframes support-live-glow {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.92);
+    }
+    50% {
+      opacity: 0.95;
+      transform: scale(1.12);
+    }
+  }
+
+  @keyframes support-headset-live {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-0.5px) scale(1.06);
+    }
+  }
 }
 
 @layer utilities {

@@ -25,9 +25,18 @@ export default function Header({
               type="button"
               onClick={onContactSupport}
               disabled={supportLoading}
-              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-soft transition-colors hover:border-liva-orange/40 hover:text-liva-orange disabled:opacity-50"
+              className="relative inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-soft transition-colors hover:border-liva-orange/40 hover:text-liva-orange disabled:opacity-50"
             >
-              <Headset className="h-3.5 w-3.5 shrink-0 text-liva-orange" strokeWidth={2} />
+              <span
+                className="pointer-events-none absolute right-0.5 top-0 z-[2] h-1.5 w-1.5 -translate-y-1/2 rounded-full border border-white bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)] animate-pulse"
+                aria-hidden
+              />
+              <span
+                className={`support-live-icon ${supportLoading ? 'support-live-icon--loading' : ''}`}
+                aria-hidden
+              >
+                <Headset className="h-3.5 w-3.5 text-liva-orange" strokeWidth={2} />
+              </span>
               <span className="hidden min-[360px]:inline">Support</span>
             </button>
           ) : null}
