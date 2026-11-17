@@ -218,6 +218,36 @@ export default function UiRenewalFlow({
           </motion.div>
         )}
 
+        {selectedPlan && isComprehensivePlan(selectedPlan) && (
+          <motion.div
+            layout
+            className="mb-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-soft"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[11px] font-medium text-gray-600">Vehicle value</span>
+              <span className="text-sm font-bold tabular-nums text-gray-900">
+                {formatAED(vehicleValue)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={limits.min}
+              max={limits.max}
+              step={limits.step}
+              value={vehicleValue}
+              onChange={(e) => onVehicleValueChange(Number(e.target.value))}
+              className="ui-range mt-2 w-full"
+              style={{
+                '--range-pct': `${((vehicleValue - limits.min) / (limits.max - limits.min)) * 100}%`,
+              }}
+            />
+            <motion.div layout className="mt-1 flex justify-between text-[9px] text-gray-500">
+              <span>Min {formatAED(limits.min)}</span>
+              <span>Max {formatAED(limits.max)}</span>
+            </motion.div>
+          </motion.div>
+        )}
+
         {addons.length > 0 && (
           <div className="mb-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-soft">
             <p className="mb-2 text-[10px] font-semibold text-gray-500">
@@ -312,31 +342,7 @@ export default function UiRenewalFlow({
                 className="overflow-hidden border-t border-gray-100 px-3 pb-3"
               >
                 <div className="pt-3">
-                  <motion.div layout className="flex items-baseline justify-between gap-2">
-                    <span className="text-[11px] font-medium text-gray-600">Vehicle value</span>
-                    <span className="text-sm font-bold tabular-nums text-gray-900">
-                      {formatAED(vehicleValue)}
-                    </span>
-                  </motion.div>
-                  <input
-                    type="range"
-                    min={limits.min}
-                    max={limits.max}
-                    step={limits.step}
-                    value={vehicleValue}
-                    onChange={(e) => onVehicleValueChange(Number(e.target.value))}
-                    className="ui-range mt-2 w-full"
-                    style={{
-                      '--range-pct': `${((vehicleValue - limits.min) / (limits.max - limits.min)) * 100}%`,
-                    }}
-                  />
-                  <motion.div layout className="mt-1 flex justify-between text-[9px] text-gray-500">
-                    <span>Min {formatAED(limits.min)}</span>
-                    <span>Max {formatAED(limits.max)}</span>
-                  </motion.div>
-                </div>
-
-                <motion.div layout className="mt-4">
+                <motion.div layout>
                   <p className="mb-1.5 text-[11px] font-medium text-gray-600">Any claims in the last year?</p>
                   <div className="flex rounded-full border border-gray-200 bg-gray-50 p-0.5">
                     {['No', 'Yes'].map((label) => (
@@ -377,6 +383,7 @@ export default function UiRenewalFlow({
                     </p>
                   </div>
                 </motion.div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

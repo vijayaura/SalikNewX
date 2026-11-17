@@ -1,12 +1,15 @@
 import { Headset } from 'lucide-react'
 import LivaLogo from './LivaLogo'
 import FlowModeToggle from './FlowModeToggle'
+import WheelMiniIcon from './WheelMiniIcon'
 
 export default function Header({
   onContactSupport,
   supportLoading,
   flowMode = 'chat',
   onFlowModeChange,
+  showWheel,
+  onOpenWheel,
 }) {
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white">
@@ -26,6 +29,17 @@ export default function Header({
             >
               <Headset className="h-3.5 w-3.5 shrink-0 text-liva-orange" strokeWidth={2} />
               <span className="hidden min-[360px]:inline">Support</span>
+            </button>
+          ) : null}
+          {showWheel && onOpenWheel ? (
+            <button
+              type="button"
+              onClick={onOpenWheel}
+              className="inline-flex items-center gap-1 rounded-full border border-liva-orange/35 bg-liva-orange px-2 py-1 text-[10px] font-semibold text-white shadow-soft transition-colors hover:bg-liva-orange-light"
+              aria-label="Open spin wheel"
+            >
+              <WheelMiniIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden min-[360px]:inline">Spin</span>
             </button>
           ) : null}
         </div>

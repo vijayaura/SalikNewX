@@ -91,7 +91,6 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
   const chatRef = useRef(null)
   const appFrameRef = useRef(null)
   const wheelWonRef = useRef(false)
-  const wheelAutoShownRef = useRef(false)
   const skipAutoScrollRef = useRef(false)
   const [wheelWinAtStage, setWheelWinAtStage] = useState(null)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
@@ -101,6 +100,10 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
 
   const handleWheelClose = useCallback(() => {
     setWheelOpen(false)
+  }, [])
+
+  const handleWheelOpen = useCallback(() => {
+    setWheelOpen(true)
   }, [])
 
   const markJourneyEngaged = useCallback(() => setJourneyEngaged(true), [])
@@ -770,25 +773,13 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
   const atOrPastPaymentStep =
     flowMode === 'ui'
       ? uiStage === 'documents' || uiStage === 'complete'
-      : stage === 'confirm' || stage === 'documents' || stage === 'complete'
+      : stage === 'documents' || stage === 'complete'
 
-  const wheelEligible =
+  const showWheelInHeader =
     !wheelSpunAndWon &&
     !atOrPastPaymentStep &&
     !videoCallActive &&
-    !paymentModalOpen
-
-  useEffect(() => {
-    if (!wheelEligible || wheelAutoShownRef.current) return
-
-    const timer = window.setTimeout(() => {
-      if (wheelSpunAndWon || atOrPastPaymentStep || videoCallActive || paymentModalOpen) return
-      wheelAutoShownRef.current = true
-      setWheelOpen(true)
-    }, 20_000)
-
-    return () => window.clearTimeout(timer)
-  }, [wheelEligible, wheelSpunAndWon, atOrPastPaymentStep, videoCallActive, paymentModalOpen])
+    !wheelOpen
 
   const supportFaqSection = (
     <div className="space-y-3" data-scroll-anchor>
@@ -855,6 +846,8 @@ export default function ChatExperience({ embedHost = false, presentationMode }) 
         onFlowModeChange={showFlowToggle ? handleFlowModeChange : undefined}
         onContactSupport={handleSupport}
         supportLoading={supportLoading}
+        showWheel={showWheelInHeader}
+        onOpenWheel={handleWheelOpen}
       />
 
       {flowMode === 'ui' && !uiSupportActive && (
